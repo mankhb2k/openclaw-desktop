@@ -1,5 +1,4 @@
 node_modules/
-.tmp-openclaw-upstream/
 .env.headless
 dist/
 release/
