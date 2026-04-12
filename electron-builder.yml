@@ -15,10 +15,58 @@ publish:
 # Place a 256x256 .ico at assets/icon.ico (already copied from upstream).
 icon: assets/icon.ico
 
+# --- ASAR: PHẢI GIỮ false ---
+# asar: true + asarUnpack đã được thử nghiệm và KHÔNG HOẠT ĐỘNG với openclaw vì:
+#   - openclaw dùng ES module (import.meta.url)
+#   - Kể cả khi asarUnpack, import.meta.url vẫn trả về "app.asar/..." (không phải app.asar.unpacked/)
+#   - openBoundaryFileSync gọi fs.openSync(O_NOFOLLOW) với ASAR virtual path → crash
+#   - Error: "Unable to open bundled plugin public surface ollama/runtime-api.js"
+# Giải pháp thay thế để giảm kích thước: dùng exclusions bên dưới.
+asar: false
+
 files:
   - dist/**/*
+  - assets/icon.ico
   - package.json
   - node_modules/**/*
+  - "!**/*.map"
+  - "!node_modules/openclaw/docs/**"
+
+  # --- LOẠI BỎ PHẦN LỚN KHÔNG CẦN ---
+
+  # Extension-level node_modules đã được hoist lên openclaw/node_modules/ bởi postinstall.
+  # Không cần ship 2 bản → tiết kiệm phần lớn trong 255MB của openclaw.
+  - "!node_modules/openclaw/dist/extensions/*/node_modules/**"
+
+  # node-llama-cpp: chỉ cần engine JS, không cần prebuilt native model runners.
+  # User phải cấu hình model riêng (.gguf) → không ship llama/ folder.
+  - "!node_modules/node-llama-cpp/llama/**"
+
+  # pdfjs-dist: bỏ web viewer demo (không dùng trong Electron)
+  - "!node_modules/pdfjs-dist/web/**"
+  - "!node_modules/pdfjs-dist/types/**"
+
+  # playwright-core: browser không được bundle sẵn (cần playwright install riêng).
+  # Chỉ giữ JS driver, bỏ thư mục browsers nếu có.
+  - "!node_modules/playwright-core/.local-browsers/**"
+  - "!node_modules/playwright-core/lib/server/chromium/**"
+  - "!node_modules/playwright-core/lib/server/firefox/**"
+  - "!node_modules/playwright-core/lib/server/webkit/**"
+
+  # TypeScript declarations không cần trong production binary
+  - "!node_modules/**/*.d.ts"
+  # Test/spec files
+  - "!node_modules/**/*.test.js"
+  - "!node_modules/**/*.spec.js"
+  - "!node_modules/**/test/**"
+  - "!node_modules/**/tests/**"
+  - "!node_modules/**/__tests__/**"
+
+  # Upstream source mirror và user data không vào bundle
+  - "!.openclaw-desktop-data/**"
+  - "!.tmp-openclaw-upstream/**"
+  - "!**/.openclaw-desktop-data/**"
+  - "!**/.tmp-openclaw-upstream/**"
 
 extraResources:
   - from: resources
@@ -26,19 +74,10 @@ extraResources:
     filter:
       - "**/*"
 
-# asarUnpack for icon file (native icon APIs cannot read inside .asar on Windows)
-asarUnpack:
-  - assets/icon.ico
-
-asar: false
-
 win:
   icon: assets/icon.ico
   signAndEditExecutable: true
   target:
-    - target: portable
-      arch:
-        - x64
     - target: nsis
       arch:
         - x64

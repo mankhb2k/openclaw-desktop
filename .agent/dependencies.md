@@ -10,6 +10,7 @@
 Được đóng gói vào NSIS .exe cùng `node_modules/`.
 
 ### `openclaw@2026.4.5`
+
 **Vai trò:** Gateway backend chính — toàn bộ business logic của OpenClaw.
 
 - **Entrypoint:** `node_modules/openclaw/openclaw.mjs` → `dist/entry.js`
@@ -23,6 +24,7 @@
 ---
 
 ### `@buape/carbon@0.14.0`
+
 **Vai trò:** Discord Bot SDK — externalized dependency của openclaw gateway.
 
 - **Tại sao cần khai báo ở fork?** openclaw ship extension Discord trong `dist/` nhưng
@@ -37,6 +39,7 @@
 ---
 
 ### `@larksuiteoapi/node-sdk@1.60.0`
+
 **Vai trò:** Feishu/Lark Bot SDK — externalized dependency của openclaw gateway.
 
 - **Lý do tương tự `@buape/carbon`:** openclaw dist load extension Feishu (`probe-*.js`)
@@ -47,6 +50,7 @@
 ---
 
 ### `electron-updater@^6.x`
+
 **Vai trò:** Auto-update NSIS installer qua GitHub Releases.
 
 - **Cách dùng:** `import { autoUpdater } from 'electron-updater'` trong `app/main/main.ts`.
@@ -61,6 +65,7 @@
 ---
 
 ### `axios@^1.x`
+
 **Vai trò:** HTTP client — fetch `update-notice.json` từ GitHub.
 
 - **Cách dùng:** Trong `main.ts`:
@@ -75,12 +80,13 @@
 ---
 
 ### `tree-kill@^1.x`
+
 **Vai trò:** Kill toàn bộ process tree khi Electron thoát.
 
 - **Cách dùng:**
   ```ts
-  import treeKill from 'tree-kill';
-  treeKill(backendLauncher.pid, 'SIGTERM', callback);
+  import treeKill from "tree-kill";
+  treeKill(backendLauncher.pid, "SIGTERM", callback);
   ```
 - **Vấn đề giải quyết:** `process.kill(pid)` chỉ kill process cha. Gateway spawn
   thêm các child processes (worker threads, sub-agents). `tree-kill` đệ quy kill
@@ -97,6 +103,7 @@ Chỉ dùng lúc build/compile — không vào bundle production.
 ---
 
 ### `electron@35.x`
+
 **Vai trò:** Chromium + Node.js runtime — nền tảng của ứng dụng desktop.
 
 - **Cung cấp:** `BrowserWindow`, `app`, `ipcMain`, `contextBridge`, `autoUpdater`...
@@ -109,6 +116,7 @@ Chỉ dùng lúc build/compile — không vào bundle production.
 ---
 
 ### `electron-builder@^25.x`
+
 **Vai trò:** Đóng gói Electron app thành Windows installer/portable.
 
 - **Cách dùng:** `npx electron-builder --win nsis`
@@ -126,6 +134,7 @@ Chỉ dùng lúc build/compile — không vào bundle production.
 ---
 
 ### `typescript@^5.7`
+
 **Vai trò:** Compile TypeScript source (`app/**/*.ts`) → JavaScript (`dist/`).
 
 - **Config:** `tsconfig.json` → `outDir: dist`, `rootDir: app`, `module: Node16`
@@ -141,6 +150,7 @@ Chỉ dùng lúc build/compile — không vào bundle production.
 ---
 
 ### `concurrently@^9.x`
+
 **Vai trò:** Chạy nhiều lệnh song song trong terminal — dùng cho dev mode.
 
 - **Cách dùng:**
@@ -154,6 +164,7 @@ Chỉ dùng lúc build/compile — không vào bundle production.
 ---
 
 ### `cross-env@^7.x`
+
 **Vai trò:** Set environment variables cross-platform (Windows `cmd` vs Unix `sh`).
 
 - **Cách dùng:**
@@ -168,6 +179,7 @@ Chỉ dùng lúc build/compile — không vào bundle production.
 ---
 
 ### `@types/node@^22.x`
+
 **Vai trò:** TypeScript type definitions cho Node.js built-in APIs.
 
 - **Cung cấp:** Types cho `fs`, `path`, `child_process`, `crypto`, `net`... trong `app/backend/`.
@@ -175,7 +187,8 @@ Chỉ dùng lúc build/compile — không vào bundle production.
 
 ---
 
-### `wait-on@^8.x` *(optional, dùng trong dev:watch)*
+### `wait-on@^8.x` _(optional, dùng trong dev:watch)_
+
 **Vai trò:** Chờ file/port xuất hiện trước khi chạy lệnh tiếp theo.
 
 - **Cách dùng:**
@@ -212,15 +225,15 @@ devDependencies (chỉ build)
 
 ## Version compatibility matrix
 
-| Package | Version | Node yêu cầu | Ghi chú |
-|---|---|---|---|
-| `openclaw` | 2026.4.5 | ≥ 22.12 | `--experimental-require-module` |
-| `@buape/carbon` | 0.14.0 | ≥ 18 | externalized dep của openclaw (Discord extension) |
-| `@larksuiteoapi/node-sdk` | 1.60.0 | ≥ 18 | externalized dep của openclaw (Feishu extension) |
-| `electron` | 35.x | ships Node 22.x | phải ≥ Node 22.12 cho gateway |
-| `electron-builder` | ^25.1 | ≥ 18 | NSIS builder trên Windows |
-| `electron-updater` | ^6.x | ≥ 16 | cần `publish.provider` trong builder config |
-| `typescript` | ^5.7 | ≥ 18 | `module: Node16` |
+| Package                   | Version  | Node yêu cầu    | Ghi chú                                           |
+| ------------------------- | -------- | --------------- | ------------------------------------------------- |
+| `openclaw`                | 2026.4.5 | ≥ 22.12         | `--experimental-require-module`                   |
+| `@buape/carbon`           | 0.14.0   | ≥ 18            | externalized dep của openclaw (Discord extension) |
+| `@larksuiteoapi/node-sdk` | 1.60.0   | ≥ 18            | externalized dep của openclaw (Feishu extension)  |
+| `electron`                | 35.x     | ships Node 22.x | phải ≥ Node 22.12 cho gateway                     |
+| `electron-builder`        | ^25.1    | ≥ 18            | NSIS builder trên Windows                         |
+| `electron-updater`        | ^6.x     | ≥ 16            | cần `publish.provider` trong builder config       |
+| `typescript`              | ^5.7     | ≥ 18            | `module: Node16`                                  |
 
 ---
 
@@ -245,4 +258,138 @@ có trong dependency graph → gateway crash lúc startup với `Cannot find mod
 
 ---
 
-*Cập nhật: 2026-04-12 | Fork openclaw-electron pin v2026.4.5*
+## _Cập nhật: 2026-04-12 | Fork openclaw-electron pin v2026.4.5_
+
+---
+
+## Cập nhật 2026-04-13: 52 dependencies thiếu từ upstream
+
+So sánh `package.json` electron wrapper vs upstream `openclaw@2026.4.5` phát hiện 52 packages chưa được khai báo.
+
+**Kết quả kiểm tra thực tế:**
+- 51/52 đã có trong `node_modules` qua transitive deps của `openclaw`
+- **1 package thực sự thiếu khỏi `node_modules`:** `node-llama-cpp` (peerDependency)
+
+Tất cả 52 đã được thêm vào `package.json` để tránh bị electron-builder prune và đảm bảo tracking rõ ràng.
+
+### Thêm vào `dependencies`
+
+| Package | Version | Mục đích |
+|---|---|---|
+| `@agentclientprotocol/sdk` | `0.18.0` | ACP agent protocol client |
+| `@anthropic-ai/vertex-sdk` | `^0.14.4` | Vertex AI (Google) provider |
+| `@aws-sdk/client-bedrock` | `3.1023.0` | AWS Bedrock LLM API |
+| `@aws-sdk/client-bedrock-runtime` | `3.1023.0` | AWS Bedrock runtime invoke |
+| `@aws-sdk/credential-provider-node` | `3.972.29` | AWS credentials từ env/file |
+| `@clack/prompts` | `^1.2.0` | CLI interactive prompts |
+| `@line/bot-sdk` | `^10.6.0` | LINE Messaging channel |
+| `@mariozechner/pi-agent-core` | `0.65.0` | Pi agent integration |
+| `@mariozechner/pi-ai` | `0.65.0` | Pi AI connector |
+| `@mariozechner/pi-coding-agent` | `0.65.0` | Pi coding agent |
+| `@mariozechner/pi-tui` | `0.65.0` | Pi TUI interface |
+| `@modelcontextprotocol/sdk` | `1.29.0` | MCP server/client SDK |
+| `@mozilla/readability` | `^0.6.0` | Web page reader (browser tool) |
+| `@sinclair/typebox` | `0.34.49` | Runtime type validation |
+| `ajv` | `^8.18.0` | JSON schema validator |
+| `chalk` | `^5.6.2` | Terminal color output |
+| `chokidar` | `^5.0.0` | File watcher |
+| `cli-highlight` | `^2.1.11` | Syntax highlight terminal |
+| `commander` | `^14.0.3` | CLI argument parsing |
+| `croner` | `^10.0.1` | Cron scheduler |
+| `dotenv` | `^17.4.0` | `.env` file loading |
+| `express` | `^5.2.1` | HTTP server (webhook endpoints) |
+| `file-type` | `22.0.0` | Detect file MIME type |
+| `gaxios` | `7.1.4` | Google API HTTP client |
+| `hono` | `4.12.10` | Lightweight web framework |
+| `ipaddr.js` | `^2.3.0` | IP parsing (SSRF guard) |
+| `jiti` | `^2.6.1` | TypeScript/ESM runtime loader |
+| `json5` | `^2.2.3` | JSON với comments |
+| `jszip` | `^3.10.1` | ZIP file handling |
+| `linkedom` | `^0.18.12` | DOM parser (headless) |
+| `long` | `^5.3.2` | 64-bit integer (Matrix protocol) |
+| `markdown-it` | `^14.1.1` | Markdown parser |
+| `matrix-js-sdk` | `41.3.0-rc.0` | Matrix chat protocol client |
+| `osc-progress` | `^0.3.0` | Progress bar |
+| `pdfjs-dist` | `^5.6.205` | PDF rendering |
+| `qrcode-terminal` | `^0.12.0` | QR code terminal (WeChat login) |
+| `tar` | `7.5.13` | Tar archive |
+| `tslog` | `^4.10.2` | Structured logger |
+| `undici` | `^8.0.1` | HTTP/2 client (Node.js native) |
+| `uuid` | `^13.0.0` | UUID generation |
+| `ws` | `^8.20.0` | WebSocket client/server |
+| `yaml` | `^2.8.3` | YAML parser |
+| `zod` | `^4.3.6` | Runtime schema validation |
+
+### Thêm vào `optionalDependencies`
+
+Native modules hoặc packages rất nặng — đặt optional để không block `npm install` nếu compile fail:
+
+| Package | Version | Lưu ý |
+|---|---|---|
+| `@homebridge/ciao` | `^1.3.6` | Native mDNS/Bonjour |
+| `@lydell/node-pty` | `1.2.0-beta.3` | **Native C++** PTY — cần `electron-rebuild` nếu dùng terminal |
+| `@matrix-org/matrix-sdk-crypto-wasm` | `18.0.0` | WASM binary E2EE cho Matrix |
+| `@napi-rs/canvas` | `^0.1.89` | **Native N-API** Canvas — peerDep của openclaw |
+| `node-edge-tts` | `^1.2.10` | Microsoft Edge TTS API |
+| `node-llama-cpp` | `3.18.1` | **Native C++** LLaMA — **package duy nhất thực sự thiếu khỏi node_modules**; peerDep của openclaw |
+| `playwright-core` | `1.59.1` | Browser automation ~80MB — cần `playwright install` riêng |
+| `sharp` | `^0.34.5` | **Native libvips** image processing |
+| `sqlite-vec` | `0.1.9` | **Native** SQLite vector extension |
+
+### Lưu ý build
+
+- **`node-llama-cpp`** và **`@lydell/node-pty`** cần rebuild cho Electron nếu dùng:
+  ```bash
+  npx electron-rebuild -f -w node-llama-cpp
+  npx electron-rebuild -f -w @lydell/node-pty
+  ```
+- **`playwright-core`** không bundle browser — cần `npx playwright install chromium` sau deploy.
+- **`opusscript` version conflict:** `opusscript@0.1.1` trong deps vs `^0.0.8` từ `prism-media` của `@discordjs/voice` — không ảnh hưởng nếu không dùng Discord voice.
+- Upstream có 2 optionalDeps chưa add: `@matrix-org/matrix-sdk-crypto-nodejs` (Linux-only) và `openshell` (package nội bộ).
+
+---
+
+## Cập nhật 2026-04-13: Chiến lược ASAR để tăng tốc build/install
+
+### Vấn đề gốc (asar: false)
+`asar: false` buộc NSIS xử lý hàng chục nghìn file riêng lẻ → build 10+ phút, install 3-5 phút.
+
+**Phân bố kích thước node_modules:**
+| Package | Size |
+|---|---|
+| `openclaw` | **255 MB** (98 extensions + mỗi extension có node_modules riêng) |
+| `pdfjs-dist` | 39 MB |
+| `node-llama-cpp` | 32 MB |
+| `matrix-js-sdk` | 11 MB |
+| `playwright-core` | 10 MB |
+
+### Tại sao không thể `asar: true` thẳng
+
+`openclaw/dist/boundary-file-read-CdxVvait.js` gọi `fs.openSync(path, O_NOFOLLOW)` + `fs.realpathSync` để load extension plugins. Electron's ASAR virtual FS không implement `O_NOFOLLOW` → crash ngay khi gateway khởi động.
+
+### Giải pháp: `asar: true` + `asarUnpack`
+
+```yaml
+asar: true
+asarUnpack:
+  - "node_modules/openclaw/**"   # real FS cho boundary checks
+  - "node_modules/**/*.node"     # native binaries không chạy được từ ASAR
+```
+
+- Toàn bộ node_modules khác → packed vào `app.asar` (1 file duy nhất)
+- openclaw → `app.asar.unpacked/node_modules/openclaw/` (real FS)
+- `import.meta.url` trong openclaw resolve đúng vì ASAR tạo symlink → unpacked path
+
+### Các exclusion để giảm kích thước
+
+| Pattern | Lý do |
+|---|---|
+| `openclaw/dist/extensions/*/node_modules/**` | Đã được hoist lên `openclaw/node_modules/` bởi postinstall — không ship 2 bản |
+| `node-llama-cpp/llama/**` | Chỉ cần JS engine, không cần prebuilt model runners |
+| `pdfjs-dist/web/**`, `pdfjs-dist/types/**` | Web viewer demo + TS types không cần trong Electron |
+| `playwright-core/lib/server/chromium\|firefox\|webkit/**` | Browser drivers không được bundle |
+| `**/*.d.ts`, `**/*.test.js`, `**/tests/**` | TypeScript declarations + test files |
+
+---
+
+## _Cập nhật: 2026-04-13 | Thêm 52 deps thiếu từ upstream openclaw@2026.4.5_
