@@ -1,0 +1,59 @@
+# Windows distributables: portable .exe + NSIS installer.
+# Output: release/
+
+appId: dev.openclaw.desktop
+productName: OpenClaw
+executableName: OpenClaw
+directories:
+  output: release
+
+publish:
+  provider: github
+  owner: Mankhb2k
+  repo: openclaw-1click
+
+# Place a 256x256 .ico at assets/icon.ico (already copied from upstream).
+icon: assets/icon.ico
+
+files:
+  - dist/**/*
+  - package.json
+  - node_modules/**/*
+
+extraResources:
+  - from: resources
+    to: resources
+    filter:
+      - "**/*"
+
+# asarUnpack for icon file (native icon APIs cannot read inside .asar on Windows)
+asarUnpack:
+  - assets/icon.ico
+
+asar: false
+
+win:
+  icon: assets/icon.ico
+  signAndEditExecutable: true
+  target:
+    - target: portable
+      arch:
+        - x64
+    - target: nsis
+      arch:
+        - x64
+
+portable:
+  artifactName: "${productName}-Portable-${version}.${ext}"
+
+nsis:
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: OpenClaw
+  uninstallDisplayName: OpenClaw
+  artifactName: "${productName}-1Click-Setup-${version}.${ext}"

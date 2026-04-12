@@ -1,0 +1,39 @@
+{
+  "name": "openclaw-electron",
+  "version": "1.0.0",
+  "description": "OpenClaw Electron fork — pinned to openclaw@2026.4.5, builds Windows EXE",
+  "private": true,
+  "main": "dist/main/main.js",
+  "author": "OpenClaw Fork",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "node scripts/hoist-openclaw-ext-deps.mjs",
+    "verify:pin": "node scripts/verify-pin.mjs",
+    "pin:write": "node scripts/pin-version.mjs",
+    "sync:src": "node scripts/sync-src.mjs",
+    "compare:upstream": "node scripts/compare-upstream.mjs",
+    "build:ts": "tsc -p tsconfig.json",
+    "build:ts:watch": "tsc -p tsconfig.json -w",
+    "dev": "concurrently -k \"tsc -p tsconfig.json -w\" \"wait-on dist/main/main.js && electron .\"",
+    "dist:nsis": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis",
+    "dist:portable": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable",
+    "dist:all": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win"
+  },
+  "dependencies": {
+    "openclaw": "2026.4.5",
+    "@buape/carbon": "0.14.0",
+    "@larksuiteoapi/node-sdk": "1.60.0",
+    "electron-updater": "^6.8.3",
+    "axios": "^1.13.6",
+    "tree-kill": "^1.2.2"
+  },
+  "devDependencies": {
+    "electron": "35.7.5",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "wait-on": "^8.0.1",
+    "@types/node": "^22.10.0"
+  }
+}
