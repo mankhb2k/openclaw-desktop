@@ -23,19 +23,17 @@
 npm run layer:manifest -- --release-tag=v1.0.0
 ```
 
-Sau đó commit file `release/backend-manifest.json` vào repo **`openclaw-1click`**
+Sau đó commit file `release/backend-manifest.json` vào **repo này** (`openclaw-desktop`)
 nhánh `main`, thư mục `release/`:
 
 ```bash
-# Trong repo openclaw-1click
-cp <path>/release/backend-manifest.json release/
 git add release/backend-manifest.json
 git commit -m "feat: add backend-manifest.json for 2-layer v1.0.0"
-git push origin main
+git push origin main   # hoặc merge PR build-2-layer → main trước
 ```
 
 > App fetch manifest từ:
-> `https://raw.githubusercontent.com/mankhb2k/openclaw-1click/main/release/backend-manifest.json`
+> `https://raw.githubusercontent.com/mankhb2k/openclaw-desktop/main/release/backend-manifest.json`
 
 ---
 

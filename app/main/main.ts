@@ -50,10 +50,10 @@ const DESKTOP_UPDATE_EVENT = "desktop:update-state";
 const UPDATE_NOTICE_URL =
   "https://raw.githubusercontent.com/mankhb2k/openclaw-1click/main/update/update-notice.json";
 
-/** URL của backend-manifest.json trên GitHub Releases (RULE-08: phải dùng GitHub Releases) */
+/** URL của backend-manifest.json — commit vào repo openclaw-desktop nhánh main, thư mục release/ */
 const BACKEND_MANIFEST_URL =
   process.env.OPENCLAW_BACKEND_MANIFEST_URL?.trim() ||
-  "https://raw.githubusercontent.com/mankhb2k/openclaw-1click/main/release/backend-manifest.json";
+  "https://raw.githubusercontent.com/mankhb2k/openclaw-desktop/main/release/backend-manifest.json";
 
 type DesktopUpdatePhase =
   | "idle"
