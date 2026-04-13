@@ -2,8 +2,14 @@ node_modules/
 .env.headless
 dist/
 release/
+# Nhưng commit manifest (không phải build artifact)
+!release/backend-manifest.json
 .openclaw-desktop-data/
 *.log
 
 # Local fork of Control UI (npm run control-ui:vendor); remove this line to commit a custom UI.
 vendor/control-ui/
+
+# control-ui dev artifacts (built output goes to vendor/control-ui/)
+control-ui/node_modules/
+control-ui/dist/

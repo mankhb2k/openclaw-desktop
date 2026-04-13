@@ -30,7 +30,10 @@
     "layer:smoke": "node scripts/smoke-test-layers.mjs",
     "layer:all": "npm run layer:check && npm run layer:pack-root && npm run layer:pack-openclaw && npm run layer:manifest && npm run layer:smoke",
     "layer:install-local": "node scripts/install-layers-local.mjs",
-    "layer:install-local:dry": "node scripts/install-layers-local.mjs --dry-run"
+    "layer:install-local:dry": "node scripts/install-layers-local.mjs --dry-run",
+    "ui:build": "cd control-ui && npm run build",
+    "ui:dev": "cd control-ui && npm run dev",
+    "ui:install": "cd control-ui && npm install"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "0.18.0",

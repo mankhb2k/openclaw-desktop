@@ -194,7 +194,7 @@ cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis
 
 **Làm gì:** Build NSIS installer cho Windows x64.
 
-**Output:** `release/OpenClaw-1Click-Setup-1.0.0.exe`
+**Output:** `release/OpenClaw-Desktop-Setup-1.0.0.exe`
 
 **`CSC_IDENTITY_AUTO_DISCOVERY=false`:** Tắt tự động tìm Authenticode certificate.
 Không có flag này thì build sẽ fail trên máy không có cert ký code.
@@ -230,7 +230,7 @@ cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win
 
 ```
 release/
-├── OpenClaw-1Click-Setup-1.0.0.exe   ← NSIS installer
+├── OpenClaw-Desktop-Setup-1.0.0.exe   ← NSIS installer
 └── OpenClaw-Portable-1.0.0.exe       ← Portable exe
 ```
 

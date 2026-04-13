@@ -46,6 +46,8 @@ const MAIN_WINDOW_MIN_WIDTH = 1180;
 const MAIN_WINDOW_MIN_HEIGHT = 700;
 
 let mainWindow: BrowserWindow | null = null;
+/** WebSocket URL của gateway hiện tại — được set sau khi backend ready */
+let currentGatewayWsUrl: string | null = null;
 const DESKTOP_UPDATE_EVENT = "desktop:update-state";
 const UPDATE_NOTICE_URL =
   "https://raw.githubusercontent.com/mankhb2k/openclaw-1click/main/update/update-notice.json";
@@ -745,6 +747,11 @@ function wireControlUiExternalLinks(
 }
 
 function registerDesktopUpdateHandler(): void {
+  // Synchronous gateway URL query from preload (used by forked control-ui)
+  ipcMain.removeAllListeners("desktop:get-gateway-url");
+  ipcMain.on("desktop:get-gateway-url", (event) => {
+    event.returnValue = currentGatewayWsUrl ?? "";
+  });
   ipcMain.removeHandler("desktop:run-update-openclaw");
   ipcMain.removeHandler("desktop:update:get-state");
   ipcMain.removeHandler("desktop:update:check");
@@ -857,6 +864,8 @@ function dashboardWindowTitle(): string {
 async function createWindow(): Promise<void> {
   const dataRoot = getDataRoot();
   const controlUiUrl = await ensureBackendAndGetUrl(dataRoot);
+  // Derive WebSocket gateway URL from controlUiUrl (http→ws, https→wss)
+  currentGatewayWsUrl = controlUiUrl.replace(/^http(s?):\/\//, (_, s) => `ws${s}://`);
 
   const windowIcon = resolveWindowIconPath();
   mainWindow = new BrowserWindow({

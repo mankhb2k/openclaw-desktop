@@ -33,12 +33,12 @@ node_modules/ tổng cộng (đã đo):     2705 MB
 
 **Kích thước sau khi nén tar.gz (ước tính):**
 
-| Layer | Uncompressed | Compressed (~60%) | Ghi chú |
-|---|---|---|---|
-| NATIVE (trong EXE) | ~90 MB | — | Pre-built binaries, nén kém |
-| ROOT-RUNTIME | ~90 MB | ~35 MB | Pure JS, nén tốt |
-| OPENCLAW | ~954 MB | ~350–400 MB | JS + binaries trộn lẫn |
-| **Tổng download** | **~1044 MB** | **~385–435 MB** | Lần đầu cài |
+| Layer              | Uncompressed | Compressed (~60%) | Ghi chú                     |
+| ------------------ | ------------ | ----------------- | --------------------------- |
+| NATIVE (trong EXE) | ~90 MB       | —                 | Pre-built binaries, nén kém |
+| ROOT-RUNTIME       | ~90 MB       | ~35 MB            | Pure JS, nén tốt            |
+| OPENCLAW           | ~954 MB      | ~350–400 MB       | JS + binaries trộn lẫn      |
+| **Tổng download**  | **~1044 MB** | **~385–435 MB**   | Lần đầu cài                 |
 
 ---
 
@@ -115,16 +115,16 @@ node_modules/ (root, không tính openclaw, devDeps, @node-llama-cpp)
 Pre-built binaries cho **Electron 35.7.5 / win32-x64 cụ thể**.  
 Sai Electron version → crash ngay khi load.
 
-| Package | Root size | Lý do native |
-|---|---|---|
-| `@lydell/node-pty` | 30 MB | C++ binding, terminal emulation |
-| `@napi-rs/canvas` | 37 MB | C++ binding, canvas rendering |
-| `@matrix-org/matrix-sdk-crypto-wasm` | 21 MB | WASM binary |
-| `node-llama-cpp` | 32 MB | C++ binding, local LLM (optional) |
-| `sharp` | 1 MB | C++ binding, image processing |
-| `sqlite-vec` | <1 MB | C++ binding, vector search |
-| `@homebridge/ciao` | <1 MB | Native network binding |
-| `@snazzah/davey-linux-x64-gnu` | — | Linux only, skip trên Windows |
+| Package                              | Root size | Lý do native                      |
+| ------------------------------------ | --------- | --------------------------------- |
+| `@lydell/node-pty`                   | 30 MB     | C++ binding, terminal emulation   |
+| `@napi-rs/canvas`                    | 37 MB     | C++ binding, canvas rendering     |
+| `@matrix-org/matrix-sdk-crypto-wasm` | 21 MB     | WASM binary                       |
+| `node-llama-cpp`                     | 32 MB     | C++ binding, local LLM (optional) |
+| `sharp`                              | 1 MB      | C++ binding, image processing     |
+| `sqlite-vec`                         | <1 MB     | C++ binding, vector search        |
+| `@homebridge/ciao`                   | <1 MB     | Native network binding            |
+| `@snazzah/davey-linux-x64-gnu`       | —         | Linux only, skip trên Windows     |
 
 > **Lưu ý**: `@napi-rs/canvas` và `@lydell/node-pty` tồn tại ở **cả root lẫn bên trong `openclaw/node_modules/`**. Bản trong root là phiên bản đã pre-build cho Electron. Bản trong openclaw/node_modules là để openclaw tự dùng. Đây là 2 bản khác nhau — không được xóa bản nào.
 
@@ -135,6 +135,7 @@ Sai Electron version → crash ngay khi load.
 **Toàn bộ `node_modules/openclaw/` là 1 atomic unit.**
 
 Không thể tách `openclaw/dist/` khỏi `openclaw/node_modules/` vì:
+
 - `openclaw/dist/extensions/*.js` import trực tiếp từ `openclaw/node_modules/`
 - Script `hoist-openclaw-ext-deps.mjs` copy packages từ `openclaw/dist/extensions/*/node_modules/` vào `openclaw/node_modules/`
 - Nếu split, import paths bị vỡ
@@ -143,7 +144,7 @@ Không thể tách `openclaw/dist/` khỏi `openclaw/node_modules/` vì:
 Layer OPENCLAW bao gồm:
   node_modules/openclaw/          954 MB uncompressed
                                   ~380 MB compressed
-  
+
 Thay đổi khi: openclaw bump version (mỗi release của upstream)
 Không thay đổi khi: chỉ thay đổi Electron shell code
 ```
@@ -226,7 +227,7 @@ Docker có layer cache hiệu quả vì mỗi layer được build độc lập 
 ```
 Docker image:                          Backend bundle:
   Layer: ubuntu base    (stable)         Tương đương: không có
-  Layer: node:22        (stable)         Tương đương: không có  
+  Layer: node:22        (stable)         Tương đương: không có
   Layer: base-deps      (stable)    ←→   KHÔNG THỂ TÁCH khỏi openclaw
   Layer: openclaw       (changes)        Layer OPENCLAW (toàn bộ 954 MB)
 ```
@@ -312,12 +313,12 @@ Dựa trên phân tích thực tế, **2 layers** là đủ và tối ưu cho re
 
 ### Lợi ích thực tế của 2-layer
 
-| Tình huống | Full single bundle | 2-layer |
-|---|---|---|
-| Cài lần đầu | Tải 1 file ~415 MB | Tải 2 file ~380+35 = 415 MB (như nhau) |
-| Update chỉ openclaw | Tải ~415 MB | Tải ~380 MB (tiết kiệm 35 MB) |
-| Update chỉ root deps | Tải ~415 MB | Tải ~35 MB (**tiết kiệm 380 MB**) |
-| Electron version bump | Build EXE mới | Build EXE mới (như nhau) |
+| Tình huống            | Full single bundle | 2-layer                                |
+| --------------------- | ------------------ | -------------------------------------- |
+| Cài lần đầu           | Tải 1 file ~415 MB | Tải 2 file ~380+35 = 415 MB (như nhau) |
+| Update chỉ openclaw   | Tải ~415 MB        | Tải ~380 MB (tiết kiệm 35 MB)          |
+| Update chỉ root deps  | Tải ~415 MB        | Tải ~35 MB (**tiết kiệm 380 MB**)      |
+| Electron version bump | Build EXE mới      | Build EXE mới (như nhau)               |
 
 > **Nhận xét thực tế**: Lợi ích chính là khi có hotfix root deps mà không cần update openclaw. Trường hợp này hiếm nhưng khi xảy ra sẽ tiết kiệm đáng kể cho user.
 
@@ -392,7 +393,7 @@ Những packages này:
   ✓ Được npm hoist lên root node_modules/ tự động khi npm install
   ✓ Nằm trong LAYER OPENCLAW (đi kèm với openclaw/)
   ✗ KHÔNG được thêm vào tar.gz của LAYER ROOT-RUNTIME
-  
+
 Lý do: nếu LAYER ROOT-RUNTIME chứa ws@8.x nhưng LAYER OPENCLAW
         mang theo ws@9.x → khi extract OPENCLAW sau, ws@9.x đè lên.
         Nhưng nếu thứ tự ngược lại → ws@8.x đè ws@9.x → gateway lỗi.
@@ -475,7 +476,7 @@ Sau rollback:
 
 ```
 Tất cả tar.gz layers PHẢI được host trên GitHub Releases của repo:
-  github.com/Mankhb2k/openclaw-1click/releases/
+  github.com/mankhb2k/openclaw-desktop/releases/
 
 Lý do:
   - npmjs.com có rate limit và downtime
@@ -570,7 +571,7 @@ node scripts/generate-backend-manifest.mjs --all --electron-version=36.x.y
     "root-runtime": {
       "version": "1",
       "sha256": "<sha256-of-tar.gz>",
-      "url": "https://github.com/Mankhb2k/openclaw-1click/releases/download/v1.0.0/layer-root-runtime-v1.tar.gz",
+      "url": "https://github.com/mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-root-runtime-v1.tar.gz",
       "compressedBytes": 36700160,
       "uncompressedBytes": 94371840,
       "extractTo": "node_modules",
@@ -580,7 +581,7 @@ node scripts/generate-backend-manifest.mjs --all --electron-version=36.x.y
     "openclaw": {
       "version": "2026.4.5",
       "sha256": "<sha256-of-tar.gz>",
-      "url": "https://github.com/Mankhb2k/openclaw-1click/releases/download/v1.0.0/layer-openclaw-v2026.4.5.tar.gz",
+      "url": "https://github.com/mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-openclaw-v2026.4.5.tar.gz",
       "compressedBytes": 398458880,
       "uncompressedBytes": 999292928,
       "extractTo": "node_modules",
@@ -602,14 +603,14 @@ node scripts/generate-backend-manifest.mjs --all --electron-version=36.x.y
 
 ### Giải thích các fields quan trọng
 
-| Field | Mục đích |
-|---|---|
-| `schemaVersion` | Versioning của manifest format, để Electron biết cách parse |
-| `electronVersion` | Lock với Electron version — nếu không khớp, từ chối update |
-| `extractOrder` | Thứ tự extract bắt buộc (root-runtime trước, openclaw sau) |
-| `requiresHoist` | Nếu `true`, Electron phải chạy hoist script sau extract |
-| `changedFrom` | Version trước đó — dùng để log và hiển thị changelog |
-| `minAppVersion` | Version EXE tối thiểu cần để dùng layers này |
+| Field             | Mục đích                                                    |
+| ----------------- | ----------------------------------------------------------- |
+| `schemaVersion`   | Versioning của manifest format, để Electron biết cách parse |
+| `electronVersion` | Lock với Electron version — nếu không khớp, từ chối update  |
+| `extractOrder`    | Thứ tự extract bắt buộc (root-runtime trước, openclaw sau)  |
+| `requiresHoist`   | Nếu `true`, Electron phải chạy hoist script sau extract     |
+| `changedFrom`     | Version trước đó — dùng để log và hiển thị changelog        |
+| `minAppVersion`   | Version EXE tối thiểu cần để dùng layers này                |
 
 ---
 
@@ -623,26 +624,31 @@ Khi triển khai Split architecture, **2 điểm trong code hiện tại** cần
 
 ```typescript
 // HIỆN TẠI (full-bundle):
-const appRoot = getProjectRoot();          // app.getAppPath() = Program Files\...\resources\app
-const cliScript = resolveOpenClawCliScript(appRoot);  // appRoot/node_modules/openclaw/openclaw.mjs
+const appRoot = getProjectRoot(); // app.getAppPath() = Program Files\...\resources\app
+const cliScript = resolveOpenClawCliScript(appRoot); // appRoot/node_modules/openclaw/openclaw.mjs
 
 backendLauncher = spawn(electronRunner, [startScript], {
   env: {
-    OPENCLAW_APP_ROOT: appRoot,            // ← trỏ vào Program Files
-    OPENCLAW_CLI_SCRIPT: cliScript,        // ← Program Files/.../openclaw.mjs
-  }
-})
+    OPENCLAW_APP_ROOT: appRoot, // ← trỏ vào Program Files
+    OPENCLAW_CLI_SCRIPT: cliScript, // ← Program Files/.../openclaw.mjs
+  },
+});
 
 // CẦN SỬA (split mode):
-const backendRoot = path.join(getDataRoot(), 'backend');   // %APPDATA%\OpenClaw\backend
-const cliScript   = path.join(backendRoot, 'node_modules', 'openclaw', 'openclaw.mjs');
+const backendRoot = path.join(getDataRoot(), "backend"); // %APPDATA%\OpenClaw\backend
+const cliScript = path.join(
+  backendRoot,
+  "node_modules",
+  "openclaw",
+  "openclaw.mjs",
+);
 
 backendLauncher = spawn(electronRunner, [startScript], {
   env: {
-    OPENCLAW_APP_ROOT: backendRoot,        // ← trỏ vào dataRoot/backend/
-    OPENCLAW_CLI_SCRIPT: cliScript,        // ← dataRoot/backend/.../openclaw.mjs
-  }
-})
+    OPENCLAW_APP_ROOT: backendRoot, // ← trỏ vào dataRoot/backend/
+    OPENCLAW_CLI_SCRIPT: cliScript, // ← dataRoot/backend/.../openclaw.mjs
+  },
+});
 ```
 
 **[app/backend/start.ts:120-136](../app/backend/start.ts)** — `resolveSpawnCwd()`
@@ -753,7 +759,7 @@ THỰC TẾ DỰ ÁN NÀY:
   ✓ Lợi ích thực sự: native modules trong EXE (không re-download),
                      và root-runtime layer update cực hiếm (~35 MB)
   ✓ Mỗi lần openclaw release → user vẫn phải tải ~380 MB
-  
+
 KHÔNG NÊN LÀM:
   ✗ Cố tách openclaw/dist/ khỏi openclaw/node_modules/ → sẽ vỡ
   ✗ Làm 3+ layers → overhead không tương xứng với lợi ích

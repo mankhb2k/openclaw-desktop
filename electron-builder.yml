@@ -104,6 +104,9 @@ files:
   - "!**/.openclaw-desktop-data/**"
   - "!**/.tmp-openclaw-upstream/**"
 
+  # Forked Control UI (built by npm run ui:build)
+  - "vendor/control-ui/**/*"
+
 extraResources:
   - from: resources
     to: resources
