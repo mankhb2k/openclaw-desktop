@@ -2,15 +2,15 @@
 # Output: release/
 
 appId: dev.openclaw.desktop
-productName: OpenClaw
-executableName: OpenClaw
+productName: OpenClaw 1Click
+executableName: OpenClaw Desktop
 directories:
   output: release
 
 publish:
   provider: github
   owner: Mankhb2k
-  repo: openclaw-1click
+  repo: openclaw-desktop
 
 # Place a 256x256 .ico at assets/icon.ico (already copied from upstream).
 icon: assets/icon.ico
@@ -42,9 +42,12 @@ files:
   # User phải cấu hình model riêng (.gguf) → không ship llama/ folder.
   - "!node_modules/node-llama-cpp/llama/**"
 
-  # pdfjs-dist: bỏ web viewer demo (không dùng trong Electron)
+  # pdfjs-dist: bỏ web viewer demo, legacy build (Electron dùng V8 mới nhất),
+  # sandbox worker (chỉ dùng trong browser context), và types.
   - "!node_modules/pdfjs-dist/web/**"
   - "!node_modules/pdfjs-dist/types/**"
+  - "!node_modules/pdfjs-dist/legacy/**"
+  - "!node_modules/pdfjs-dist/build/pdf.sandbox*"
 
   # playwright-core: browser không được bundle sẵn (cần playwright install riêng).
   # Chỉ giữ JS driver, bỏ thư mục browsers nếu có.
@@ -52,6 +55,11 @@ files:
   - "!node_modules/playwright-core/lib/server/chromium/**"
   - "!node_modules/playwright-core/lib/server/firefox/**"
   - "!node_modules/playwright-core/lib/server/webkit/**"
+
+  # matrix-js-sdk: source TypeScript gốc (runtime dùng lib/ không dùng src/)
+  # và spec/test files không cần trong production.
+  - "!node_modules/matrix-js-sdk/src/**"
+  - "!node_modules/matrix-js-sdk/spec/**"
 
   # TypeScript declarations không cần trong production binary
   - "!node_modules/**/*.d.ts"
@@ -61,6 +69,34 @@ files:
   - "!node_modules/**/test/**"
   - "!node_modules/**/tests/**"
   - "!node_modules/**/__tests__/**"
+
+  # Documentation và meta files — không bao giờ được đọc ở runtime
+  - "!node_modules/**/README*"
+  - "!node_modules/**/CHANGELOG*"
+  - "!node_modules/**/CHANGES*"
+  - "!node_modules/**/HISTORY*"
+  - "!node_modules/**/NOTICE*"
+  - "!node_modules/**/AUTHORS*"
+  - "!node_modules/**/CONTRIBUTORS*"
+
+  # Examples, demos, benchmarks — chỉ dùng cho dev/showcase, không cần trong binary
+  - "!node_modules/**/examples/**"
+  - "!node_modules/**/demo/**"
+  - "!node_modules/**/demos/**"
+  - "!node_modules/**/benchmark/**"
+  - "!node_modules/**/benchmarks/**"
+  - "!node_modules/**/fixtures/**"
+  - "!node_modules/**/sample/**"
+  - "!node_modules/**/samples/**"
+
+  # Dev config artifacts bên trong node_modules — không cần ở runtime
+  - "!node_modules/**/*.flow"
+  - "!node_modules/**/tsconfig*.json"
+  - "!node_modules/**/.eslintrc*"
+  - "!node_modules/**/.eslintignore"
+  - "!node_modules/**/.npmignore"
+  - "!node_modules/**/.prettierrc*"
+  - "!node_modules/**/jest.config*"
 
   # Upstream source mirror và user data không vào bundle
   - "!.openclaw-desktop-data/**"
