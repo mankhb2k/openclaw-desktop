@@ -52,7 +52,8 @@ const UPDATE_NOTICE_URL =
 
 /** URL của backend-manifest.json trên GitHub Releases (RULE-08: phải dùng GitHub Releases) */
 const BACKEND_MANIFEST_URL =
-  "https://raw.githubusercontent.com/Mankhb2k/openclaw-1click/main/release/backend-manifest.json";
+  process.env.OPENCLAW_BACKEND_MANIFEST_URL?.trim() ||
+  "https://raw.githubusercontent.com/mankhb2k/openclaw-1click/main/release/backend-manifest.json";
 
 type DesktopUpdatePhase =
   | "idle"
@@ -178,7 +179,12 @@ async function fetchLocalizedUpdateNotice(params?: {
     }
     return {
       title: pickLocalizedNoticeField(table, locale, "title", params),
-      description: pickLocalizedNoticeField(table, locale, "description", params),
+      description: pickLocalizedNoticeField(
+        table,
+        locale,
+        "description",
+        params,
+      ),
     };
   } catch {
     return { title: null, description: null };
@@ -286,7 +292,8 @@ function initDesktopUpdater(): void {
       announcementTitle: null,
       announcementDescription: null,
       progressPercent: null,
-      message: "Auto-update chỉ hỗ trợ bản cài NSIS, không hỗ trợ bản portable.",
+      message:
+        "Auto-update chỉ hỗ trợ bản cài NSIS, không hỗ trợ bản portable.",
     });
     return;
   }
@@ -363,14 +370,17 @@ function initDesktopUpdater(): void {
     }
     setDesktopUpdateState({
       phase: "downloading",
-      progressPercent: Number.isFinite(progress.percent) ? progress.percent : null,
+      progressPercent: Number.isFinite(progress.percent)
+        ? progress.percent
+        : null,
     });
   });
   autoUpdater.on("update-downloaded", () => {
     setDesktopUpdateState({
       phase: "downloaded",
       progressPercent: 100,
-      message: "Bản cập nhật đã tải xong. Nhấn Update lần nữa để cài đặt và khởi động lại.",
+      message:
+        "Bản cập nhật đã tải xong. Nhấn Update lần nữa để cài đặt và khởi động lại.",
     });
   });
   autoUpdater.on("error", (error) => {
@@ -416,7 +426,9 @@ function packagedDevtoolsFlagPaths(): string[] {
     raw.push(path.join(path.dirname(portableFile), PACKAGED_DEVTOOLS_FLAG));
   }
   try {
-    raw.push(path.join(path.dirname(app.getPath("exe")), PACKAGED_DEVTOOLS_FLAG));
+    raw.push(
+      path.join(path.dirname(app.getPath("exe")), PACKAGED_DEVTOOLS_FLAG),
+    );
   } catch {
     /* ignore */
   }
@@ -473,7 +485,10 @@ function readReadyState(dataRoot: string): {
   return { controlUiUrl, gatewayPort: parsed.gatewayPort };
 }
 
-async function waitForLauncherReady(dataRoot: string, timeoutMs: number): Promise<void> {
+async function waitForLauncherReady(
+  dataRoot: string,
+  timeoutMs: number,
+): Promise<void> {
   const readyFile = path.join(dataRoot, "launcher-ready.json");
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -547,7 +562,9 @@ function startBackendLauncher(dataRoot: string): void {
       [ENV_DATA_ROOT]: dataRoot,
       OPENCLAW_APP_ROOT: appRoot,
       OPENCLAW_CLI_SCRIPT: cliScript,
-      OPENCLAW_SEED_WORKSPACE: fs.existsSync(seedWorkspace) ? seedWorkspace : "",
+      OPENCLAW_SEED_WORKSPACE: fs.existsSync(seedWorkspace)
+        ? seedWorkspace
+        : "",
       [ENV_ELECTRON_RUNNER]: electronRunner,
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -582,7 +599,11 @@ function scheduleBackendLayerCheck(dataRoot: string): void {
       electronVersion: process.versions.electron ?? "35.7.5",
       projectRoot: getProjectRoot(),
       onProgress: (state: LayerUpdateState) => {
-        console.log("[layer-update]", state.phase, state.message ?? state.error ?? "");
+        console.log(
+          "[layer-update]",
+          state.phase,
+          state.message ?? state.error ?? "",
+        );
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send(BACKEND_LAYER_UPDATE_EVENT, state);
         }
@@ -606,14 +627,20 @@ async function openControlUiInBrowser(): Promise<void> {
     ({ controlUiUrl } = readReadyState(dataRoot));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    dialog.showErrorBox("OpenClaw Control UI", `Could not read launcher state: ${msg}`);
+    dialog.showErrorBox(
+      "OpenClaw Control UI",
+      `Could not read launcher state: ${msg}`,
+    );
     return;
   }
   try {
     await shell.openExternal(controlUiUrl);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    dialog.showErrorBox("OpenClaw Control UI", `Could not open browser: ${msg}`);
+    dialog.showErrorBox(
+      "OpenClaw Control UI",
+      `Could not open browser: ${msg}`,
+    );
   }
 }
 
@@ -668,7 +695,9 @@ function registerGlobalShortcuts(): void {
     void openControlUiInBrowser();
   });
   if (!registered) {
-    console.warn("[main] Could not register global shortcut CommandOrControl+Shift+O");
+    console.warn(
+      "[main] Could not register global shortcut CommandOrControl+Shift+O",
+    );
   }
 }
 
@@ -681,7 +710,10 @@ function isHttpOrHttpsUrl(raw: string): boolean {
   }
 }
 
-function wireControlUiExternalLinks(wc: WebContents, controlUiUrl: string): void {
+function wireControlUiExternalLinks(
+  wc: WebContents,
+  controlUiUrl: string,
+): void {
   wc.setWindowOpenHandler(({ url }) => {
     if (isHttpOrHttpsUrl(url)) {
       void shell.openExternal(url);
@@ -736,12 +768,16 @@ function registerDesktopUpdateHandler(): void {
       if (!isElectronUpdaterEnabled()) {
         return {
           ok: false as const,
-          error: "Auto-update chỉ hỗ trợ bản cài NSIS. Bản portable vui lòng tải bản mới từ GitHub Releases.",
+          error:
+            "Auto-update chỉ hỗ trợ bản cài NSIS. Bản portable vui lòng tải bản mới từ GitHub Releases.",
         };
       }
       if (desktopUpdateState.phase === "downloaded") {
         installDesktopUpdate();
-        return { ok: true as const, message: "Đang cài đặt bản mới và khởi động lại ứng dụng." };
+        return {
+          ok: true as const,
+          message: "Đang cài đặt bản mới và khởi động lại ứng dụng.",
+        };
       }
       await downloadDesktopUpdate();
       return {
@@ -755,7 +791,10 @@ function registerDesktopUpdateHandler(): void {
     const appRoot = getProjectRoot();
     const pkgPath = path.join(appRoot, "package.json");
     if (!fs.existsSync(pkgPath)) {
-      return { ok: false as const, error: "Không tìm thấy package.json tại thư mục ứng dụng." };
+      return {
+        ok: false as const,
+        error: "Không tìm thấy package.json tại thư mục ứng dụng.",
+      };
     }
     return await new Promise<
       | { ok: true; message?: string }
@@ -777,11 +816,22 @@ function registerDesktopUpdateHandler(): void {
         stdout += c.toString();
         if (stdout.length > 16_000) stdout = stdout.slice(-16_000);
       });
-      child.on("error", (err) => { resolve({ ok: false, error: err.message }); });
+      child.on("error", (err) => {
+        resolve({ ok: false, error: err.message });
+      });
       child.on("close", (code) => {
-        if (code === 0) { resolve({ ok: true }); return; }
-        const tail = (stderr.trim() || stdout.trim() || `exit ${code}`).slice(-4000);
-        resolve({ ok: false, error: `npm run update:openclaw thất bại (mã ${code}).`, stderrTail: tail });
+        if (code === 0) {
+          resolve({ ok: true });
+          return;
+        }
+        const tail = (stderr.trim() || stdout.trim() || `exit ${code}`).slice(
+          -4000,
+        );
+        resolve({
+          ok: false,
+          error: `npm run update:openclaw thất bại (mã ${code}).`,
+          stderrTail: tail,
+        });
       });
     });
   });
@@ -840,7 +890,11 @@ async function createWindow(): Promise<void> {
     "did-fail-load",
     (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
       if (isMainFrame) {
-        console.error("[main] Control UI failed to load:", { errorCode, errorDescription, validatedURL });
+        console.error("[main] Control UI failed to load:", {
+          errorCode,
+          errorDescription,
+          validatedURL,
+        });
       }
     },
   );
@@ -851,7 +905,11 @@ async function createWindow(): Promise<void> {
     "console-message",
     (e: ElectronEvent<WebContentsConsoleMessageEventParams>) => {
       if (e.level === "warning" || e.level === "error") {
-        console.error("[control-ui]", e.message, e.sourceId ? `(${e.sourceId}:${e.lineNumber})` : "");
+        console.error(
+          "[control-ui]",
+          e.message,
+          e.sourceId ? `(${e.sourceId}:${e.lineNumber})` : "",
+        );
       }
     },
   );
