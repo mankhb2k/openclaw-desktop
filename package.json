@@ -20,7 +20,14 @@
     "dist:installer": "npm run build:ts:prod && npm run dist:nsis",
     "dist:nsis": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis",
     "dist:portable": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable",
-    "dist:all": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win"
+    "dist:all": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win",
+    "layer:pack-openclaw": "node scripts/pack-layer-openclaw.mjs",
+    "layer:pack-root": "node scripts/pack-layer-root-runtime.mjs",
+    "layer:pack-root:bump": "node scripts/pack-layer-root-runtime.mjs --bump",
+    "layer:check": "node scripts/check-layer-overlap.mjs",
+    "layer:manifest": "node scripts/generate-backend-manifest.mjs",
+    "layer:smoke": "node scripts/smoke-test-layers.mjs",
+    "layer:all": "npm run layer:check && npm run layer:pack-root && npm run layer:pack-openclaw && npm run layer:manifest && npm run layer:smoke"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "0.18.0",
