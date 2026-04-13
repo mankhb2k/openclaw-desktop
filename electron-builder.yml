@@ -131,4 +131,4 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: OpenClaw Desktop
   uninstallDisplayName: OpenClaw Desktop
-  artifactName: "${productName}-Setup-${version}.${ext}"
+  artifactName: "Openclaw-Desktop-Setup-${version}.${ext}"
