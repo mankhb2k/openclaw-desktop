@@ -6,9 +6,9 @@
  *
  * Exclusions (mirror electron-builder.yml rules + RULE-02):
  *   MUST:  openclaw/docs/
- *   MAY:   openclaw/dist/extensions/*\/node_modules/  (đã hoist lên openclaw/node_modules/)
- *          **\/*.map, **\/*.d.ts
- *          **/test/, **/__tests__/, **/spec/
+ *   MAY:   openclaw/dist/extensions/<ext>/node_modules/  (đã hoist lên openclaw/node_modules/)
+ *          *.map, *.d.ts
+ *          test/, __tests__/, spec/
  *          README*, CHANGELOG*, examples/, demo/, benchmark/, fixtures/
  *          tsconfig*.json, .eslintrc*, .prettierrc*, jest.config*, .npmignore
  *
