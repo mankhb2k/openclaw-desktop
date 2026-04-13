@@ -29,6 +29,12 @@ import {
 import { ENV_DATA_ROOT, ENV_DESKTOP_RESOURCES } from "../backend/config";
 import { resolveWindowIconPath } from "./app-icon";
 import { resolveElectronRunnerPath } from "./electron-runner";
+import {
+  isSplitModeReady,
+  updateBackendLayers,
+  BACKEND_LAYER_UPDATE_EVENT,
+  type LayerUpdateState,
+} from "./layer-updater";
 
 const ENV_ELECTRON_RUNNER = "OPENCLAW_ELECTRON_RUNNER";
 
@@ -43,6 +49,10 @@ let mainWindow: BrowserWindow | null = null;
 const DESKTOP_UPDATE_EVENT = "desktop:update-state";
 const UPDATE_NOTICE_URL =
   "https://raw.githubusercontent.com/mankhb2k/openclaw-1click/main/update/update-notice.json";
+
+/** URL của backend-manifest.json trên GitHub Releases (RULE-08: phải dùng GitHub Releases) */
+const BACKEND_MANIFEST_URL =
+  "https://raw.githubusercontent.com/Mankhb2k/openclaw-1click/main/release/backend-manifest.json";
 
 type DesktopUpdatePhase =
   | "idle"
@@ -500,8 +510,18 @@ async function ensureBackendAndGetUrl(dataRoot: string): Promise<string> {
 
 function startBackendLauncher(dataRoot: string): void {
   const startScript = path.join(__dirname, "..", "backend", "start.js");
-  const appRoot = getProjectRoot();
+
+  // Split mode (RULE-06): nếu backend/ đã được extract vào userData, dùng nó thay vì bundled app.
+  // isSplitModeReady() kiểm tra xem openclaw.mjs có tồn tại trong dataRoot/backend/ không.
+  const splitReady = app.isPackaged && isSplitModeReady(dataRoot);
+  const appRoot = splitReady
+    ? path.join(dataRoot, "backend")
+    : getProjectRoot();
   const cliScript = resolveOpenClawCliScript(appRoot);
+
+  if (splitReady) {
+    console.log("[main] Split mode: using backend from", appRoot);
+  }
 
   fs.mkdirSync(dataRoot, { recursive: true });
 
@@ -543,6 +563,32 @@ function startBackendLauncher(dataRoot: string): void {
     console.error(`[backend] launcher exited code=${code} signal=${signal}`);
     backendLauncher = null;
   });
+}
+
+/**
+ * Chạy background check và (nếu cần) download 2-layer backend update.
+ * Gọi sau khi gateway đã sẵn sàng để không block startup.
+ * Progress được forward tới renderer qua IPC (BACKEND_LAYER_UPDATE_EVENT).
+ */
+function scheduleBackendLayerCheck(dataRoot: string): void {
+  if (!app.isPackaged) return; // chỉ chạy ở packaged mode
+
+  // Delay 10 giây sau startup để UI load xong trước
+  setTimeout(() => {
+    void updateBackendLayers({
+      dataRoot,
+      manifestUrl: BACKEND_MANIFEST_URL,
+      appVersion: app.getVersion(),
+      electronVersion: process.versions.electron ?? "35.7.5",
+      projectRoot: getProjectRoot(),
+      onProgress: (state: LayerUpdateState) => {
+        console.log("[layer-update]", state.phase, state.message ?? state.error ?? "");
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send(BACKEND_LAYER_UPDATE_EVENT, state);
+        }
+      },
+    });
+  }, 10_000).unref();
 }
 
 async function openControlUiInBrowser(): Promise<void> {
@@ -859,10 +905,14 @@ if (!gotLock) {
     void checkDesktopUpdates();
     buildApplicationMenu();
     registerGlobalShortcuts();
-    void createWindow().catch((err) => {
-      console.error(err);
-      app.quit();
-    });
+    void createWindow()
+      .then(() => {
+        scheduleBackendLayerCheck(getDataRoot());
+      })
+      .catch((err) => {
+        console.error(err);
+        app.quit();
+      });
   });
 
   app.on("activate", () => {
