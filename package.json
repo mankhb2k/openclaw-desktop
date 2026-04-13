@@ -1,10 +1,11 @@
 {
   "name": "openclaw-electron",
   "version": "1.0.0",
-  "description": "OpenClaw Electron fork — pinned to openclaw@2026.4.5, builds Windows EXE",
+  "productName": "OpenClaw Desktop",
+  "description": "OpenClaw Desktop — Electron wrapper for openclaw@2026.4.5, builds Windows installer",
   "private": true,
   "main": "dist/main/main.js",
-  "author": "OpenClaw Fork",
+  "author": "OpenClaw Desktop",
   "license": "MIT",
   "scripts": {
     "postinstall": "node scripts/hoist-openclaw-ext-deps.mjs",

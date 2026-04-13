@@ -2,7 +2,7 @@
 # Output: release/
 
 appId: dev.openclaw.desktop
-productName: OpenClaw 1Click
+productName: OpenClaw Desktop
 executableName: OpenClaw Desktop
 directories:
   output: release
@@ -129,6 +129,6 @@ nsis:
   allowElevation: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: OpenClaw
-  uninstallDisplayName: OpenClaw
-  artifactName: "${productName}-1Click-Setup-${version}.${ext}"
+  shortcutName: OpenClaw Desktop
+  uninstallDisplayName: OpenClaw Desktop
+  artifactName: "${productName}-Setup-${version}.${ext}"
