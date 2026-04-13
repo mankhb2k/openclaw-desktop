@@ -85,9 +85,10 @@ main.js → launchBackend()
   └─ spawn(electronRunner, ['dist/backend/start.js'], {
          ELECTRON_RUN_AS_NODE: '1',
          OPENCLAW_DESKTOP_DATA_ROOT: dataRoot,
-         OPENCLAW_APP_ROOT: appRoot,
-         OPENCLAW_CLI_SCRIPT: node_modules/openclaw/openclaw.mjs,
+         OPENCLAW_APP_ROOT: appRoot,           ← app.getAppPath() khi packaged
+         OPENCLAW_CLI_SCRIPT: path.join(appRoot, 'node_modules/openclaw/openclaw.mjs'),
          OPENCLAW_SEED_WORKSPACE: resources/workspace/  (nếu tồn tại),
+         OPENCLAW_ELECTRON_RUNNER: electronRunner,
      })
 ```
 
@@ -115,13 +116,21 @@ start.js  (ELECTRON_RUN_AS_NODE=1, không có Electron APIs)
   ├─ allocateGatewayPort(18789)
   │    → thử port 18789, 18790, 18791... cho đến khi tìm được port free
   │
-  ├─ spawn(electronRunner, [openclaw.mjs, 'gateway', 'run',
+  ├─ spawn(gatewayRunner, [openclaw.mjs, 'gateway', 'run',
   │         '--port', PORT, '--allow-unconfigured'], {
-  │       ELECTRON_RUN_AS_NODE: '1',
-  │       OPENCLAW_DATA_ROOT: openclawDir,
+  │       ELECTRON_RUN_AS_NODE: '1',         ← hoặc bỏ nếu dùng system Node
+  │       OPENCLAW_DIR: openclawDir,          ← %APPDATA%\OpenClaw\openclaw\
+  │       OPENCLAW_STATE_DIR: openclawDir,
   │       OPENCLAW_WORKSPACE: workspaceDir,
-  │       ...baseEnv
+  │       WORKSPACE_DIR: workspaceDir,
+  │       OPENCLAW_CONFIG: openclawConfigFile,
+  │       OPENCLAW_CONFIG_PATH: openclawConfigFile,
+  │       OPENCLAW_GATEWAY_TOKEN: token,     ← nếu dùng token auth
+  │       OPENCLAW_DESKTOP_APP_ROOT: appRoot,
   │   })
+  │
+  │   Lưu ý: nếu env OPENCLAW_GATEWAY_NODE trỏ tới Node.js 22+
+  │   thì dùng system node thay vì Electron (không cần ELECTRON_RUN_AS_NODE=1)
   │    → stdout/stderr pipe → logsDir/openclaw-gateway.log
   │
   ├─ waitForTcpPort('127.0.0.1', PORT, timeout=120s)
@@ -160,7 +169,7 @@ main.js → createWindow()
   │       webPreferences: {
   │         contextIsolation: true,
   │         nodeIntegration: false,
-  │         preload: 'dist/main/preload.js'
+  │         preload: 'dist/main/preload-control-ui.js'  ← compiled từ preload-control-ui.ts
   │       }
   │   })
   │
@@ -172,7 +181,13 @@ main.js → createWindow()
   │
   └─ mainWindow.loadURL(controlUiUrl)
        → BrowserWindow render Control UI từ gateway
-       → preload.js expose window.openclawDesktop
+       → preload-control-ui.js expose window.openclawDesktop API:
+            runUpdateOpenclaw()   ← trigger update openclaw npm package
+            getUpdateState()      ← lấy trạng thái desktop update
+            checkForUpdates()     ← gọi electron-updater check
+            downloadUpdate()      ← download installer mới
+            installUpdate()       ← quitAndInstall
+            onUpdateState(fn)     ← subscribe realtime update events
 ```
 
 ---
@@ -311,8 +326,9 @@ dist/
     └── process-registry.js
 
 node_modules/openclaw/
+├── openclaw.mjs          ← CLI entry point (chạy với ELECTRON_RUN_AS_NODE=1)
 └── dist/
-    └── entry.js          ← openclaw CLI/gateway (chạy với ELECTRON_RUN_AS_NODE=1)
+    └── index.js          ← được openclaw.mjs import (gateway core)
 
 resources/
 └── workspace/            ← seed workspace (copy lần đầu)

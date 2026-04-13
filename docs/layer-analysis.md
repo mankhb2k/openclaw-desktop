@@ -283,7 +283,8 @@ Dựa trên phân tích thực tế, **2 layers** là đủ và tối ưu cho re
 │  Kích thước: ~954 MB uncompressed / ~380 MB compressed             │
 ├────────────────────────────────────────────────────────────────────┤
 │  node_modules/openclaw/ (toàn bộ, nguyên khối)                     │
-│  Bao gồm: dist/, node_modules/, openclaw.mjs, docs/, assets/       │
+│  Bao gồm: dist/, node_modules/, openclaw.mjs, assets/              │
+│  LOẠI BỎ khi pack: docs/ (14 MB, không được runtime load)          │
 │                                                                     │
 │  Thay đổi khi: openclaw bump version                               │
 │  Sau khi extract: BẮT BUỘC chạy hoist-openclaw-ext-deps.mjs       │
@@ -299,12 +300,14 @@ Dựa trên phân tích thực tế, **2 layers** là đủ và tối ưu cho re
 2. Extract LAYER OPENCLAW
        → dataRoot/backend/node_modules/openclaw/  (thay thế hoàn toàn)
 
-3. Chạy hoist-openclaw-ext-deps.mjs
+3. Chạy hoist-openclaw-ext-deps.mjs trong context dataRoot/backend/
        → copy packages từ openclaw/dist/extensions/*/node_modules/
          vào openclaw/node_modules/ (nếu chưa có)
 
-4. Khởi động gateway với:
-       OPENCLAW_APP_ROOT = dataRoot/backend/
+4. Khởi động gateway — main.ts cần truyền:
+       OPENCLAW_APP_ROOT    = dataRoot/backend/
+       OPENCLAW_CLI_SCRIPT  = dataRoot/backend/node_modules/openclaw/openclaw.mjs
+       (thay vì app.getAppPath() như hiện tại)
 ```
 
 ### Lợi ích thực tế của 2-layer
@@ -348,12 +351,14 @@ TRIGGER: muốn tối ưu dung lượng LAYER OPENCLAW
 BẮT BUỘC:
   □ Giữ nguyên cấu trúc thư mục openclaw/ khi đóng gói
   □ Không xóa openclaw/node_modules/ để "tiết kiệm" (sẽ vỡ import)
-  □ Không xóa openclaw/docs/ nếu openclaw.mjs reference tới docs/
+
+PHẢI loại bỏ khi đóng gói layer (xác nhận bằng grep — openclaw.mjs có 0 reference tới docs/):
+  □ openclaw/docs/  ← 14 MB tài liệu tĩnh (Markdown, JSON, hình ảnh)
+                       không được load tại runtime, loại hoàn toàn
 
 ĐƯỢC PHÉP loại bỏ theo electron-builder.yml đang có:
   □ openclaw/dist/extensions/*/node_modules/ (đã hoist lên openclaw/node_modules/)
-  □ openclaw/docs/ (nếu verify không cần thiết tại runtime)
-  □ Các file *.map, *.d.ts, test/ bên trong openclaw/
+  □ Các file **/*.map, **/*.d.ts, **/test/, **/__tests__/ bên trong openclaw/
 ```
 
 ---
@@ -608,6 +613,137 @@ node scripts/generate-backend-manifest.mjs --all --electron-version=36.x.y
 
 ---
 
+## 9. Kết nối với runtime code thực tế
+
+### 9.1 Những chỗ cần thay đổi trong code để hỗ trợ Split mode
+
+Khi triển khai Split architecture, **2 điểm trong code hiện tại** cần được sửa:
+
+**[app/main/main.ts:501-535](../app/main/main.ts)** — `startBackendLauncher()`
+
+```typescript
+// HIỆN TẠI (full-bundle):
+const appRoot = getProjectRoot();          // app.getAppPath() = Program Files\...\resources\app
+const cliScript = resolveOpenClawCliScript(appRoot);  // appRoot/node_modules/openclaw/openclaw.mjs
+
+backendLauncher = spawn(electronRunner, [startScript], {
+  env: {
+    OPENCLAW_APP_ROOT: appRoot,            // ← trỏ vào Program Files
+    OPENCLAW_CLI_SCRIPT: cliScript,        // ← Program Files/.../openclaw.mjs
+  }
+})
+
+// CẦN SỬA (split mode):
+const backendRoot = path.join(getDataRoot(), 'backend');   // %APPDATA%\OpenClaw\backend
+const cliScript   = path.join(backendRoot, 'node_modules', 'openclaw', 'openclaw.mjs');
+
+backendLauncher = spawn(electronRunner, [startScript], {
+  env: {
+    OPENCLAW_APP_ROOT: backendRoot,        // ← trỏ vào dataRoot/backend/
+    OPENCLAW_CLI_SCRIPT: cliScript,        // ← dataRoot/backend/.../openclaw.mjs
+  }
+})
+```
+
+**[app/backend/start.ts:120-136](../app/backend/start.ts)** — `resolveSpawnCwd()`
+
+```typescript
+// Không cần sửa — resolveSpawnCwd() đã handle trường hợp path là directory thực
+// dataRoot/backend/ là real directory (không phải .asar) → sẽ dùng đúng
+const gatewayCwd = resolveSpawnCwd(appRoot, electronExe);
+// appRoot = dataRoot/backend/ → isDirectory() = true → trả về appRoot ✓
+```
+
+---
+
+### 9.2 Data paths thực tế trên Windows (packaged)
+
+```
+app.getPath('userData') = %APPDATA%\OpenClaw\   ← appId: dev.openclaw.desktop, productName: OpenClaw
+app.getAppPath()        = C:\Program Files\OpenClaw\resources\app\
+
+Cấu trúc hiện tại (full-bundle):
+  %APPDATA%\OpenClaw\
+    ├── launcher-ready.json
+    ├── workspace\
+    ├── openclaw\              ← OPENCLAW_DIR, OPENCLAW_STATE_DIR, openclaw.json
+    └── logs\
+
+Cấu trúc mới (split mode, thêm):
+  %APPDATA%\OpenClaw\
+    ├── launcher-ready.json
+    ├── workspace\
+    ├── openclaw\
+    ├── logs\
+    ├── backend\               ← OPENCLAW_APP_ROOT trong split mode
+    │   └── node_modules\
+    │       ├── openclaw\      ← LAYER OPENCLAW extracted ở đây
+    │       └── ...            ← LAYER ROOT-RUNTIME extracted ở đây
+    ├── backend-old\           ← backup khi update, xóa sau khi gateway mới healthy
+    └── backend-version.json   ← { rootRuntime: "1", openclaw: "2026.4.5" }
+```
+
+---
+
+### 9.3 ENV variables hoàn chỉnh — gateway spawn
+
+```
+ENV vars truyền cho openclaw gateway (từ app/backend/config.ts):
+
+Luôn có:
+  OPENCLAW_DIR              = %APPDATA%\OpenClaw\openclaw\
+  OPENCLAW_STATE_DIR        = %APPDATA%\OpenClaw\openclaw\
+  OPENCLAW_WORKSPACE        = %APPDATA%\OpenClaw\workspace\
+  WORKSPACE_DIR             = %APPDATA%\OpenClaw\workspace\
+  OPENCLAW_CONFIG           = %APPDATA%\OpenClaw\openclaw\openclaw.json
+  OPENCLAW_CONFIG_PATH      = %APPDATA%\OpenClaw\openclaw\openclaw.json
+  OPENCLAW_DESKTOP_APP_ROOT = appRoot (Program Files / dataRoot/backend tùy mode)
+
+Khi có token auth:
+  OPENCLAW_GATEWAY_TOKEN    = <random base64url 32 chars>
+
+Khi dùng system Node thay vì Electron:
+  OPENCLAW_GATEWAY_NODE     = C:\path\to\node.exe  (Node.js 22+)
+  (nếu set → không dùng ELECTRON_RUN_AS_NODE=1)
+
+Custom Control UI (nếu có vendor/control-ui/):
+  Gateway tự detect qua resolveDesktopControlUiRoot()
+  Không cần env var thêm
+```
+
+---
+
+### 9.4 IPC handlers cần mở rộng cho Split mode
+
+`preload-control-ui.ts` hiện expose `window.openclawDesktop` — cần thêm:
+
+```typescript
+// Thêm vào contextBridge.exposeInMainWorld('openclawDesktop', { ... })
+
+// Lấy version của từng layer đang chạy
+getBackendLayerVersions: (): Promise<{
+  rootRuntime: string;
+  openclaw: string;
+}> => ipcRenderer.invoke('desktop:backend:get-versions'),
+
+// Check xem có backend layer update không (gọi manifest từ GitHub)
+checkBackendUpdate: (): Promise<BackendUpdateState> =>
+  ipcRenderer.invoke('desktop:backend:check-update'),
+
+// Download + extract layer mới (progress events qua onBackendUpdateProgress)
+downloadBackendUpdate: (): Promise<BackendUpdateState> =>
+  ipcRenderer.invoke('desktop:backend:download-update'),
+
+// Subscribe progress events
+onBackendUpdateProgress: (listener: (state: BackendUpdateState) => void): (() => void) => {
+  const handler = (_: IpcRendererEvent, payload: BackendUpdateState) => listener(payload);
+  ipcRenderer.on('desktop:backend-update-progress', handler);
+  return () => ipcRenderer.removeListener('desktop:backend-update-progress', handler);
+},
+```
+
+---
+
 ## Tóm tắt cuối cùng
 
 ```
@@ -629,4 +765,8 @@ KHÔNG NÊN LÀM:
   □ Smoke test tự động sau mỗi pack
   □ Không bao giờ upload manifest trước khi tar.gz đã có trên Release
   □ Giữ backend-old/ cho đến khi gateway mới confirmed healthy
+
+2 DÒNG CODE QUAN TRỌNG NHẤT KHI TRIỂN KHAI SPLIT:
+  1. startBackendLauncher(): OPENCLAW_APP_ROOT = dataRoot/backend/ (không phải appRoot)
+  2. startBackendLauncher(): OPENCLAW_CLI_SCRIPT = dataRoot/backend/node_modules/openclaw/openclaw.mjs
 ```
