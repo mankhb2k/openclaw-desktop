@@ -1,15 +1,15 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-04-14T09:43:50.142Z",
-  "electronVersion": "35.7.5",
+  "generatedAt": "2026-04-14T14:33:46.408Z",
+  "electronVersion": "41.2.0",
   "platform": "win32",
   "arch": "x64",
   "layers": {
     "root-runtime": {
       "version": "1",
-      "sha256": "7472ebfe86a6feed260ad8354c1827e3197f54f3efd7d115a35ec0eef96a1946",
+      "sha256": "9d33e70f54baffd356b1f20ecf606c732c453793c87126979cfb14c293b2e27c",
       "url": "https://github.com/Mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-root-runtime-v1.tar.gz",
-      "compressedBytes": 298470,
+      "compressedBytes": 298335,
       "uncompressedBytes": 0,
       "extractTo": "node_modules",
       "requiresHoist": false,
@@ -17,9 +17,9 @@
     },
     "openclaw": {
       "version": "2026.4.5",
-      "sha256": "41251e66197714b02b740b4b704137278cf46f56bf8d3aa943e69943b7e199f5",
+      "sha256": "3876a65aed1a3bff0b0cfd0582fbc18a85f717d50615d75263e54231cbe6f0a4",
       "url": "https://github.com/Mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-openclaw-v2026.4.5.tar.gz",
-      "compressedBytes": 28010870,
+      "compressedBytes": 16862721,
       "uncompressedBytes": 0,
       "extractTo": "node_modules",
       "requiresHoist": true,
