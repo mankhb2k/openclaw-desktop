@@ -49,8 +49,15 @@ const dataRoot = resolveDataRoot()
 const backendDir = path.join(dataRoot, 'backend')
 
 // ── Resolve layer files ───────────────────────────────────────────────────────
-const rootPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
-const ocVersion = rootPkg.dependencies.openclaw.replace(/^[^0-9]*/, '')
+// Đọc version từ release/backend-manifest.json (không phụ thuộc root package.json)
+const manifestPath = path.join(RELEASE_DIR, 'backend-manifest.json')
+if (!fs.existsSync(manifestPath)) {
+  console.error('[install-local] ERROR: release/backend-manifest.json not found')
+  console.error('  → Run: npm run layer:manifest')
+  process.exit(1)
+}
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+const ocVersion = manifest.layers.openclaw.version
 
 const versionFile = path.join(RELEASE_DIR, 'root-runtime-version.txt')
 const rootRuntimeVersion = fs.existsSync(versionFile)
@@ -124,11 +131,10 @@ try {
 }
 
 // ── Write backend-version.json ────────────────────────────────────────────────
-const electronVersion = process.versions.node // best we can do outside Electron context
 const versions = {
   'root-runtime': rootRuntimeVersion,
   openclaw: ocVersion,
-  electronVersion: rootPkg.devDependencies?.electron?.replace(/^[^0-9]*/, '') ?? '35.7.5',
+  electronVersion: manifest.electronVersion ?? '35.7.5',
 }
 const versionJsonPath = path.join(dataRoot, 'backend-version.json')
 fs.writeFileSync(versionJsonPath, JSON.stringify(versions, null, 2) + '\n')

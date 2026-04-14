@@ -16,5 +16,4 @@ control-ui/dist/
 
 # Windows directory junctions trỏ vào .tmp-openclaw-upstream/ (tạo bằng PowerShell New-Item -ItemType Junction)
 # Cần thiết để Vite resolve '../../../src/' và '../../../apps/' imports khi build control-ui
-/src/
-/apps/
+

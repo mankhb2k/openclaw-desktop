@@ -417,6 +417,13 @@ function getDataRoot(): string {
   return app.getPath("userData");
 }
 
+function resolveSetupHtmlPath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "resources", "setup.html");
+  }
+  return path.resolve(getProjectRoot(), "resources", "setup.html");
+}
+
 function packagedDevtoolsFlagPaths(): string[] {
   const raw: string[] = [];
   const portableDir = process.env[ENV_PORTABLE_EXE_DIR]?.trim();
@@ -861,8 +868,117 @@ function dashboardWindowTitle(): string {
   return `OpenClaw Dashboard v${app.getVersion()}`;
 }
 
+// ── First-run setup flow ──────────────────────────────────────────────────────
+
+/**
+ * Hiện setup window và chờ user bấm "Tải backend".
+ * Sau khi download + extract xong, navigate sang Control UI bình thường.
+ */
+async function runSetupFlow(dataRoot: string): Promise<void> {
+  const windowIcon = resolveWindowIconPath();
+  mainWindow = new BrowserWindow({
+    width: 520,
+    height: 420,
+    resizable: false,
+    show: false,
+    backgroundColor: "#0e1015",
+    title: "OpenClaw Desktop — Setup",
+    ...(process.platform === "win32"
+      ? { icon: nativeImage.createEmpty() }
+      : windowIcon
+        ? { icon: windowIcon }
+        : {}),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, "setup-preload.js"),
+    },
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+
+  mainWindow.once("ready-to-show", () => mainWindow?.show());
+  await mainWindow.loadFile(resolveSetupHtmlPath());
+  mainWindow.setProgressBar(0);
+
+  // Lắng nghe nút "Tải backend" — once để tránh duplicate
+  ipcMain.once("setup:start-download", () => {
+    void performInitialDownload(dataRoot);
+  });
+}
+
+/**
+ * Download + extract backend layers, sau đó navigate sang Control UI.
+ * Gọi sau khi user bấm nút trong setup window.
+ */
+async function performInitialDownload(dataRoot: string): Promise<void> {
+  function sendProgress(state: LayerUpdateState): void {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send("setup:progress", state);
+    if (typeof state.progressPercent === "number") {
+      mainWindow.setProgressBar(state.progressPercent / 100);
+    }
+  }
+
+  try {
+    await updateBackendLayers({
+      dataRoot,
+      manifestUrl: BACKEND_MANIFEST_URL,
+      appVersion: app.getVersion(),
+      electronVersion: process.versions.electron ?? "35.7.5",
+      projectRoot: getProjectRoot(),
+      onProgress: sendProgress,
+    });
+
+    mainWindow?.setProgressBar(-1);
+
+    // Backend ready → khởi động gateway và load Control UI
+    const controlUiUrl = await ensureBackendAndGetUrl(dataRoot);
+    currentGatewayWsUrl = controlUiUrl.replace(
+      /^http(s?):\/\//,
+      (_, s) => `ws${s}://`,
+    );
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      // Chuyển sang kích thước bình thường
+      mainWindow.setResizable(true);
+      mainWindow.setSize(1280, 800);
+      mainWindow.setMinimumSize(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT);
+      mainWindow.setTitle(dashboardWindowTitle());
+      mainWindow.on("page-title-updated", (e) => {
+        e.preventDefault();
+        mainWindow?.setTitle(dashboardWindowTitle());
+      });
+      wireControlUiExternalLinks(mainWindow.webContents, controlUiUrl);
+      registerDesktopUpdateHandler();
+      await mainWindow.loadURL(controlUiUrl);
+      publishDesktopUpdateState();
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[setup] performInitialDownload failed:", msg);
+    if (!mainWindow?.isDestroyed()) {
+      mainWindow?.setProgressBar(-1);
+      mainWindow?.webContents.send("setup:progress", {
+        phase: "error",
+        error: msg,
+        message: `Lỗi: ${msg}`,
+      });
+    }
+  }
+}
+
 async function createWindow(): Promise<void> {
   const dataRoot = getDataRoot();
+
+  // ── First-run: backend chưa được cài → hiện setup screen ──────────────
+  if (app.isPackaged && !isSplitModeReady(dataRoot)) {
+    await runSetupFlow(dataRoot);
+    return;
+  }
+
   const controlUiUrl = await ensureBackendAndGetUrl(dataRoot);
   // Derive WebSocket gateway URL from controlUiUrl (http→ws, https→wss)
   currentGatewayWsUrl = controlUiUrl.replace(/^http(s?):\/\//, (_, s) => `ws${s}://`);

@@ -58,12 +58,20 @@ const releaseTagArg = args
 const rootPkg = JSON.parse(
   fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
 );
-
-const ocVersion = rootPkg.dependencies.openclaw.replace(/^[^0-9]*/, "");
 const appVersion = rootPkg.version;
 const electronVersion =
   electronVersionArg ||
   (rootPkg.devDependencies?.electron || "35.7.5").replace(/^[^0-9]*/, "");
+
+// ── Openclaw version: đọc từ node_modules/openclaw/package.json ──────────────
+const openclawPkgPath = path.join(ROOT, "node_modules", "openclaw", "package.json");
+if (!fs.existsSync(openclawPkgPath)) {
+  console.error("[manifest] ERROR: node_modules/openclaw/package.json not found.");
+  console.error("  → Run: npm install (với openclaw còn trong node_modules)");
+  console.error("  → Hoặc chạy layer:manifest TRƯỚC khi xóa openclaw khỏi node_modules.");
+  process.exit(1);
+}
+const ocVersion = JSON.parse(fs.readFileSync(openclawPkgPath, "utf8")).version;
 
 // ── Release info ──────────────────────────────────────────────────────────────
 // GitHub releases base URL (từ electron-builder.yml: owner=Mankhb2k, repo=openclaw-desktop)

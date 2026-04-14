@@ -30,9 +30,9 @@ const OPENCLAW_DIR = path.join(NM, 'openclaw')
 const RELEASE_DIR = path.join(ROOT, 'release')
 
 // ── Version ─────────────────────────────────────────────────────────────────
-const rootPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
-// Strip semver range prefix (^, ~, >=, etc.)
-const ocVersion = rootPkg.dependencies.openclaw.replace(/^[^0-9]*/, '')
+// Đọc từ node_modules/openclaw/package.json (không phụ thuộc root package.json)
+const ocPkg = JSON.parse(fs.readFileSync(path.join(OPENCLAW_DIR, 'package.json'), 'utf8'))
+const ocVersion = ocPkg.version
 const OUTPUT = path.join(RELEASE_DIR, `layer-openclaw-v${ocVersion}.tar.gz`)
 
 // ── Sanity checks ────────────────────────────────────────────────────────────

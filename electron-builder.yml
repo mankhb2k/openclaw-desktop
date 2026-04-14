@@ -28,9 +28,17 @@ files:
   - dist/**/*
   - assets/icon.ico
   - package.json
+  - scripts/hoist-openclaw-ext-deps.mjs
   - node_modules/**/*
   - "!**/*.map"
   - "!node_modules/openclaw/docs/**"
+
+  # --- SLIM: Loại openclaw và extension deps ra khỏi exe ---
+  # Chúng được download dưới dạng layers từ GitHub Releases lần đầu chạy app.
+
+  - "!node_modules/openclaw/**"
+  - "!node_modules/@buape/**"
+  - "!node_modules/@larksuiteoapi/**"
 
   # --- LOẠI BỎ PHẦN LỚN KHÔNG CẦN ---
 
