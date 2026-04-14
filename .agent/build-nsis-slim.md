@@ -556,6 +556,24 @@ asar: true  # thay cho asar: false
 
 ---
 
+### Lỗi 12: Packaged exe thoát ngay (EXIT:0) khi chạy từ Claude Code shell
+
+**Triệu chứng:** `release/win-unpacked/OpenClaw Desktop.exe` thoát ngay sau launch, exit code 0, không có log, không có setup screen.
+
+**Nguyên nhân:** Claude Code tự inject `ELECTRON_RUN_AS_NODE=1` vào shell environment. Khi env var này tồn tại, Electron binary chạy như Node.js thay vì Electron, `require('electron')` bị thiếu → `app` undefined → crash/exit ngay.
+
+**Chứng minh:** Chạy exe với PowerShell sau khi xóa env var:
+```powershell
+$pinfo.EnvironmentVariables.Remove('ELECTRON_RUN_AS_NODE')
+```
+→ App chạy bình thường, setup screen hiện đúng, STILL RUNNING sau 8s.
+
+**Fix:** Không có gì cần fix trong code. Khi user double-click exe trong Windows Explorer, `ELECTRON_RUN_AS_NODE` không tồn tại → app hoạt động bình thường.
+
+**Lưu ý:** Khi test trong Claude Code shell, phải dùng PowerShell và remove env var trước khi chạy, HOẶC dùng `scripts/start-electron.mjs` (đã xóa env var trước spawn).
+
+---
+
 ## 8. Checklist trước khi release
 
 - [ ] `tar@6.x` trong dependencies (KHÔNG phải v7+)
@@ -568,6 +586,7 @@ asar: true  # thay cho asar: false
 - [ ] `"!node_modules/openclaw/**"` trong files exclusions
 - [ ] `openDevTools({ mode: 'detach' })` đã XÓA khỏi `runSetupFlow()` trong main.ts
 - [ ] Test first-run: xóa `backend/` và `backend-version.json`, chạy exe mới
+- [ ] KHÔNG test từ Claude Code shell (ELECTRON_RUN_AS_NODE=1 sẽ gây EXIT:0 ngay lập tức)
 
 ---
 
