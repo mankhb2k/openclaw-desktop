@@ -186,9 +186,10 @@ async function runHoistScript(backendDir: string, projectRoot: string): Promise<
   );
 
   // Patch ROOT constant để trỏ vào backendDir thay vì project root
+  // Dùng /^const ROOT\s*=.*$/m để replace cả dòng, tránh bị broken bởi nested parens
   const hoistPatched = hoistSrc.replace(
-    /const ROOT\s*=\s*path\.resolve\([^)]+\)/,
-    `const ROOT = ${JSON.stringify(backendDir)}`,
+    /^const ROOT\s*=.*$/m,
+    `const ROOT = ${JSON.stringify(backendDir)};`,
   );
 
   const tempHoist = path.join(backendDir, '_hoist-run.mjs');

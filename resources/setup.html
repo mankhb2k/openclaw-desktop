@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; style-src 'unsafe-inline'">
+        content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
   <title>OpenClaw Desktop</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -58,64 +58,11 @@
     <div class="bar-wrap"><div id="bar" class="bar"></div></div>
     <p id="status" class="status">Sẵn sàng tải backend.</p>
     <div class="actions">
-      <button id="btn-download" onclick="startDownload()">Tải backend</button>
-      <button id="btn-retry"    onclick="resetUI()">Thử lại</button>
+      <button id="btn-download">Tải backend</button>
+      <button id="btn-retry">Thử lại</button>
     </div>
   </div>
 
-  <script>
-    const bar         = document.getElementById('bar');
-    const statusEl    = document.getElementById('status');
-    const btnDownload = document.getElementById('btn-download');
-    const btnRetry    = document.getElementById('btn-retry');
-
-    const phaseLabel = {
-      checking:   'Đang kiểm tra manifest...',
-      downloading:'Đang tải...',
-      verifying:  'Đang xác minh tính toàn vẹn...',
-      extracting: 'Đang giải nén...',
-      hoisting:   'Đang cấu hình extension deps...',
-      swapping:   'Đang áp dụng...',
-      complete:   'Hoàn tất! Đang khởi động...',
-      error:      'Cài đặt thất bại.',
-    };
-
-    function startDownload() {
-      btnDownload.disabled = true;
-      btnRetry.style.display = 'none';
-      bar.className = 'bar';
-      statusEl.className = 'status';
-      statusEl.textContent = 'Đang bắt đầu...';
-      window.setupAPI.startDownload();
-    }
-
-    function resetUI() {
-      btnDownload.disabled = false;
-      btnRetry.style.display = 'none';
-      bar.style.width = '0%';
-      bar.className = 'bar';
-      statusEl.textContent = 'Sẵn sàng tải backend.';
-      statusEl.className = 'status';
-    }
-
-    window.setupAPI.onProgress((state) => {
-      const pct = typeof state.progressPercent === 'number'
-        ? state.progressPercent
-        : state.phase === 'complete' ? 100 : 0;
-
-      bar.style.width = pct + '%';
-      statusEl.textContent = state.message || phaseLabel[state.phase] || state.phase;
-
-      if (state.phase === 'error') {
-        bar.className = 'bar error';
-        statusEl.className = 'status error';
-        btnDownload.disabled = false;
-        btnRetry.style.display = 'block';
-      } else if (state.phase === 'complete') {
-        bar.style.width = '100%';
-        statusEl.className = 'status ok';
-      }
-    });
-  </script>
+  <script src="setup-renderer.js"></script>
 </body>
 </html>

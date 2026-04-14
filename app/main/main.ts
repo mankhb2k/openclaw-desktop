@@ -903,9 +903,14 @@ async function runSetupFlow(dataRoot: string): Promise<void> {
   await mainWindow.loadFile(resolveSetupHtmlPath());
   mainWindow.setProgressBar(0);
 
-  // Lắng nghe nút "Tải backend" — once để tránh duplicate
-  ipcMain.once("setup:start-download", () => {
-    void performInitialDownload(dataRoot);
+  // Lắng nghe nút "Tải backend" — guard flag để tránh duplicate nhưng vẫn cho retry
+  let downloading = false;
+  ipcMain.on("setup:start-download", () => {
+    if (downloading) return;
+    downloading = true;
+    void performInitialDownload(dataRoot).finally(() => {
+      downloading = false;
+    });
   });
 }
 
@@ -974,7 +979,8 @@ async function createWindow(): Promise<void> {
   const dataRoot = getDataRoot();
 
   // ── First-run: backend chưa được cài → hiện setup screen ──────────────
-  if (app.isPackaged && !isSplitModeReady(dataRoot)) {
+  const forceSetup = process.env.FORCE_SETUP_SCREEN === '1';
+  if ((app.isPackaged || forceSetup) && !isSplitModeReady(dataRoot)) {
     await runSetupFlow(dataRoot);
     return;
   }
