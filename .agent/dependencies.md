@@ -203,15 +203,15 @@ Chỉ dùng lúc build/compile — không vào bundle production.
 ## Tóm tắt phân loại
 
 ```
-dependencies (vào .exe bundle)
+dependencies (6 packages — vào .exe bundle)
 ├── openclaw@2026.4.5          ← gateway runtime (pinned)
-├── @buape/carbon@0.14.0       ← Discord SDK (externalized dep của openclaw)
-├── @larksuiteoapi/node-sdk    ← Feishu/Lark SDK (externalized dep của openclaw)
-├── electron-updater           ← NSIS auto-update
-├── axios                      ← fetch update-notice
-└── tree-kill                  ← clean shutdown process tree
+├── @buape/carbon@0.14.0       ← Discord SDK (externalized dep, npm deduplicate ra top-level)
+├── @larksuiteoapi/node-sdk    ← Feishu/Lark SDK (lý do tương tự)
+├── electron-updater           ← NSIS auto-update (direct import app code)
+├── axios                      ← fetch update-notice (direct import app code)
+└── tree-kill                  ← clean shutdown process tree (direct import app code)
 
-devDependencies (chỉ build)
+devDependencies (7 packages — chỉ build, không vào bundle)
 ├── electron             ← Chromium+Node runtime (bundled bởi electron-builder)
 ├── electron-builder     ← packager → .exe
 ├── typescript           ← compile app/ → dist/
@@ -219,6 +219,21 @@ devDependencies (chỉ build)
 ├── cross-env            ← cross-platform env vars
 ├── wait-on              ← dev:watch wait for compile
 └── @types/node          ← TS types cho Node APIs
+
+optionalDependencies (10 packages — peerDeps native/heavy của openclaw)
+├── node-llama-cpp             ← LLaMA C++ (peerDep, phải khai báo để npm install)
+├── @napi-rs/canvas            ← Canvas N-API
+├── @lydell/node-pty           ← PTY C++ (cần electron-rebuild)
+├── @matrix-org/matrix-sdk-crypto-wasm ← Matrix E2EE WASM
+├── @homebridge/ciao           ← mDNS native
+├── @snazzah/davey-linux-x64-gnu ← Linux binary (Discord)
+├── node-edge-tts              ← Edge TTS
+├── playwright-core            ← browser automation ~80MB
+├── sharp                      ← image processing native
+└── sqlite-vec                 ← SQLite vector native
+
+Tất cả deps khác của openclaw (grammy, shiki, express, zod, ws, v.v.)
+→ tự cài qua transitive deps hoặc extension hoist — KHÔNG cần khai báo ở root
 ```
 
 ---
@@ -262,77 +277,73 @@ có trong dependency graph → gateway crash lúc startup với `Cannot find mod
 
 ---
 
-## Cập nhật 2026-04-13: 52 dependencies thiếu từ upstream
+## Cập nhật 2026-04-14: Slim down về minimal set
 
-So sánh `package.json` electron wrapper vs upstream `openclaw@2026.4.5` phát hiện 52 packages chưa được khai báo.
+### Phân tích tại sao không cần khai báo lại deps của openclaw
 
-**Kết quả kiểm tra thực tế:**
-- 51/52 đã có trong `node_modules` qua transitive deps của `openclaw`
-- **1 package thực sự thiếu khỏi `node_modules`:** `node-llama-cpp` (peerDependency)
+Trước đây (2026-04-13) đã thêm 52 deps từ upstream vào root `package.json`. Sau phân tích kỹ cơ chế npm + electron-builder, kết luận: **chỉ cần 6 packages trong `dependencies`**.
 
-Tất cả 52 đã được thêm vào `package.json` để tránh bị electron-builder prune và đảm bảo tracking rõ ràng.
+**Cơ chế hoạt động:**
 
-### Thêm vào `dependencies`
+```
+npm install
+  ├─ cài openclaw + 50 deps nó khai báo (transitive) → npm KHÔNG prune
+  └─ chạy postinstall → hoist-openclaw-ext-deps.mjs
+       └─ copy extension deps vào node_modules/openclaw/node_modules/
+          (grammy, shiki, @slack/*, discord-api-types, v.v.)
+          → npm đã prune xong rồi, những packages này tồn tại sau prune
 
-| Package | Version | Mục đích |
+electron-builder bundle toàn bộ node_modules/ → mọi thứ vào .exe
+```
+
+**Ba nhóm packages:**
+
+| Nhóm | Ví dụ | Cần khai báo? |
 |---|---|---|
-| `@agentclientprotocol/sdk` | `0.18.0` | ACP agent protocol client |
-| `@anthropic-ai/vertex-sdk` | `^0.14.4` | Vertex AI (Google) provider |
-| `@aws-sdk/client-bedrock` | `3.1023.0` | AWS Bedrock LLM API |
-| `@aws-sdk/client-bedrock-runtime` | `3.1023.0` | AWS Bedrock runtime invoke |
-| `@aws-sdk/credential-provider-node` | `3.972.29` | AWS credentials từ env/file |
-| `@clack/prompts` | `^1.2.0` | CLI interactive prompts |
-| `@line/bot-sdk` | `^10.6.0` | LINE Messaging channel |
-| `@mariozechner/pi-agent-core` | `0.65.0` | Pi agent integration |
-| `@mariozechner/pi-ai` | `0.65.0` | Pi AI connector |
-| `@mariozechner/pi-coding-agent` | `0.65.0` | Pi coding agent |
-| `@mariozechner/pi-tui` | `0.65.0` | Pi TUI interface |
-| `@modelcontextprotocol/sdk` | `1.29.0` | MCP server/client SDK |
-| `@mozilla/readability` | `^0.6.0` | Web page reader (browser tool) |
-| `@sinclair/typebox` | `0.34.49` | Runtime type validation |
-| `ajv` | `^8.18.0` | JSON schema validator |
-| `chalk` | `^5.6.2` | Terminal color output |
-| `chokidar` | `^5.0.0` | File watcher |
-| `cli-highlight` | `^2.1.11` | Syntax highlight terminal |
-| `commander` | `^14.0.3` | CLI argument parsing |
-| `croner` | `^10.0.1` | Cron scheduler |
-| `dotenv` | `^17.4.0` | `.env` file loading |
-| `express` | `^5.2.1` | HTTP server (webhook endpoints) |
-| `file-type` | `22.0.0` | Detect file MIME type |
-| `gaxios` | `7.1.4` | Google API HTTP client |
-| `hono` | `4.12.10` | Lightweight web framework |
-| `ipaddr.js` | `^2.3.0` | IP parsing (SSRF guard) |
-| `jiti` | `^2.6.1` | TypeScript/ESM runtime loader |
-| `json5` | `^2.2.3` | JSON với comments |
-| `jszip` | `^3.10.1` | ZIP file handling |
-| `linkedom` | `^0.18.12` | DOM parser (headless) |
-| `long` | `^5.3.2` | 64-bit integer (Matrix protocol) |
-| `markdown-it` | `^14.1.1` | Markdown parser |
-| `matrix-js-sdk` | `41.3.0-rc.0` | Matrix chat protocol client |
-| `osc-progress` | `^0.3.0` | Progress bar |
-| `pdfjs-dist` | `^5.6.205` | PDF rendering |
-| `qrcode-terminal` | `^0.12.0` | QR code terminal (WeChat login) |
-| `tar` | `7.5.13` | Tar archive |
-| `tslog` | `^4.10.2` | Structured logger |
-| `undici` | `^8.0.1` | HTTP/2 client (Node.js native) |
-| `uuid` | `^13.0.0` | UUID generation |
-| `ws` | `^8.20.0` | WebSocket client/server |
-| `yaml` | `^2.8.3` | YAML parser |
-| `zod` | `^4.3.6` | Runtime schema validation |
+| Deps openclaw tự khai báo | ajv, chalk, express, hono, zod, yaml, ws... (43 packages) | Không — npm install tự cài qua transitive |
+| Extension deps (hoisted) | grammy, shiki, @slack/bolt, discord-api-types... | Không — hoist script copy sau npm prune |
+| Deps app Electron code dùng trực tiếp | axios, tree-kill, electron-updater | **Phải khai báo** |
+| Externalized deps (npm deduplicate ra top-level) | @buape/carbon, @larksuiteoapi/node-sdk | **Phải khai báo** — xem lý do bên dưới |
 
-### Thêm vào `optionalDependencies`
+### Root `package.json` — Bảng dependencies cần thiết
 
-Native modules hoặc packages rất nặng — đặt optional để không block `npm install` nếu compile fail:
+#### `dependencies` (6 packages)
 
-| Package | Version | Lưu ý |
+| Package | Version | Lý do bắt buộc khai báo |
+|---|---|---|
+| `openclaw` | `2026.4.5` | Gateway runtime chính |
+| `axios` | `^1.13.6` | Trực tiếp import trong `app/main/main.ts` — fetch `update-notice.json` |
+| `tree-kill` | `^1.2.2` | Trực tiếp import trong `app/backend/process-registry.ts` — kill process tree |
+| `electron-updater` | `^6.8.3` | Trực tiếp import trong `app/main/main.ts` — NSIS auto-update |
+| `@buape/carbon` | `0.14.0` | openclaw không khai báo; npm deduplicate lên top-level dưới dạng ESM-only → gateway crash `Cannot find module` nếu thiếu |
+| `@larksuiteoapi/node-sdk` | `1.60.0` | Lý do tương tự `@buape/carbon` |
+
+#### `devDependencies` (7 packages — không vào bundle)
+
+| Package | Version | Vai trò |
+|---|---|---|
+| `electron` | `35.7.5` | Runtime Chromium+Node (bundled bởi electron-builder) |
+| `electron-builder` | `^25.1.8` | Đóng gói → `.exe` NSIS/portable |
+| `typescript` | `^5.7.2` | Compile `app/**/*.ts` → `dist/` |
+| `concurrently` | `^9.1.0` | Dev mode: chạy song song `tsc -w` + `electron .` |
+| `cross-env` | `^7.0.3` | Set env vars cross-platform (Windows/Unix) |
+| `wait-on` | `^8.0.1` | Dev mode: chờ `dist/main/main.js` tồn tại trước khi launch Electron |
+| `@types/node` | `^22.10.0` | TypeScript types cho Node.js built-ins |
+
+#### `optionalDependencies` (10 packages — peerDeps openclaw không tự khai báo)
+
+> Đặt `optional` vì đây là native/heavy modules — không block `npm install` nếu compile fail.
+
+| Package | Version | Vai trò |
 |---|---|---|
 | `@homebridge/ciao` | `^1.3.6` | Native mDNS/Bonjour |
 | `@lydell/node-pty` | `1.2.0-beta.3` | **Native C++** PTY — cần `electron-rebuild` nếu dùng terminal |
 | `@matrix-org/matrix-sdk-crypto-wasm` | `18.0.0` | WASM binary E2EE cho Matrix |
-| `@napi-rs/canvas` | `^0.1.89` | **Native N-API** Canvas — peerDep của openclaw |
+| `@napi-rs/canvas` | `^0.1.89` | **Native N-API** Canvas |
+| `@snazzah/davey-linux-x64-gnu` | `0.1.11` | Linux binary cho davey (Discord) |
 | `node-edge-tts` | `^1.2.10` | Microsoft Edge TTS API |
-| `node-llama-cpp` | `3.18.1` | **Native C++** LLaMA — **package duy nhất thực sự thiếu khỏi node_modules**; peerDep của openclaw |
-| `playwright-core` | `1.59.1` | Browser automation ~80MB — cần `playwright install` riêng |
+| `node-llama-cpp` | `3.18.1` | **Native C++** LLaMA — peerDep của openclaw; không có trong `node_modules` nếu không khai báo |
+| `playwright-core` | `1.59.1` | Browser automation ~80MB — cần `npx playwright install chromium` riêng |
 | `sharp` | `^0.34.5` | **Native libvips** image processing |
 | `sqlite-vec` | `0.1.9` | **Native** SQLite vector extension |
 
@@ -344,8 +355,7 @@ Native modules hoặc packages rất nặng — đặt optional để không blo
   npx electron-rebuild -f -w @lydell/node-pty
   ```
 - **`playwright-core`** không bundle browser — cần `npx playwright install chromium` sau deploy.
-- **`opusscript` version conflict:** `opusscript@0.1.1` trong deps vs `^0.0.8` từ `prism-media` của `@discordjs/voice` — không ảnh hưởng nếu không dùng Discord voice.
-- Upstream có 2 optionalDeps chưa add: `@matrix-org/matrix-sdk-crypto-nodejs` (Linux-only) và `openshell` (package nội bộ).
+- Upstream có 2 optionalDeps không cần add: `@matrix-org/matrix-sdk-crypto-nodejs` (Linux-only) và `openshell` (package nội bộ).
 
 ---
 
@@ -392,4 +402,4 @@ asarUnpack:
 
 ---
 
-## _Cập nhật: 2026-04-13 | Thêm 52 deps thiếu từ upstream openclaw@2026.4.5_
+## _Cập nhật: 2026-04-14 | Slim down về minimal set — 6 deps thay vì 140+_

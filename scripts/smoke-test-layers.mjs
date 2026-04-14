@@ -110,7 +110,7 @@ try {
   // Patch hoist script to use tempDir as ROOT instead of its own parent dir
   const hoistSrc = fs.readFileSync(path.join(ROOT, 'scripts', 'hoist-openclaw-ext-deps.mjs'), 'utf8')
   const hoistPatched = hoistSrc.replace(
-    /const ROOT\s*=\s*path\.resolve\([^)]+\)/,
+    /const ROOT\s*=\s*.+/,
     `const ROOT = ${JSON.stringify(tempDir)}`
   )
   const tempHoist = path.join(tempDir, '_hoist.mjs')
