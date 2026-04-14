@@ -1,15 +1,15 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-04-14T14:33:46.408Z",
+  "generatedAt": "2026-04-14T15:36:01.783Z",
   "electronVersion": "41.2.0",
   "platform": "win32",
   "arch": "x64",
   "layers": {
     "root-runtime": {
       "version": "1",
-      "sha256": "9d33e70f54baffd356b1f20ecf606c732c453793c87126979cfb14c293b2e27c",
+      "sha256": "7472ebfe86a6feed260ad8354c1827e3197f54f3efd7d115a35ec0eef96a1946",
       "url": "https://github.com/Mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-root-runtime-v1.tar.gz",
-      "compressedBytes": 298335,
+      "compressedBytes": 298470,
       "uncompressedBytes": 0,
       "extractTo": "node_modules",
       "requiresHoist": false,
