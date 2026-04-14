@@ -35,16 +35,16 @@ OpenClaw.exe (Electron)
 
 ### Các biến môi trường quan trọng
 
-| Biến | Set bởi | Ý nghĩa |
-|---|---|---|
-| `OPENCLAW_APP_ROOT` | Electron main | Đường dẫn tới thư mục app (`resources/app`) |
-| `OPENCLAW_DESKTOP_DATA_ROOT` | Electron main | `%APPDATA%\openclaw-electron\` — nơi lưu config, log, workspace |
-| `ELECTRON_RUN_AS_NODE` | Electron main | Bật chế độ Node.js thuần cho backend launcher |
-| `OPENCLAW_ELECTRON_RUNNER` | Electron main | Path tới `OpenClaw.exe` thực (tránh ENOENT khi portable) |
-| `OPENCLAW_CLI_SCRIPT` | Electron main | Override path tới `openclaw.mjs` |
-| `OPENCLAW_GATEWAY_NODE` | (optional) | Path tới Node.js 22.12+ nếu cần dùng thay Electron |
-| `OPENCLAW_DIR` / `OPENCLAW_STATE_DIR` | backend/config.ts | Thư mục config openclaw |
-| `OPENCLAW_WORKSPACE` | backend/config.ts | Thư mục workspace |
+| Biến                                  | Set bởi           | Ý nghĩa                                                         |
+| ------------------------------------- | ----------------- | --------------------------------------------------------------- |
+| `OPENCLAW_APP_ROOT`                   | Electron main     | Đường dẫn tới thư mục app (`resources/app`)                     |
+| `OPENCLAW_DESKTOP_DATA_ROOT`          | Electron main     | `%APPDATA%\openclaw-electron\` — nơi lưu config, log, workspace |
+| `ELECTRON_RUN_AS_NODE`                | Electron main     | Bật chế độ Node.js thuần cho backend launcher                   |
+| `OPENCLAW_ELECTRON_RUNNER`            | Electron main     | Path tới `OpenClaw.exe` thực (tránh ENOENT khi portable)        |
+| `OPENCLAW_CLI_SCRIPT`                 | Electron main     | Override path tới `openclaw.mjs`                                |
+| `OPENCLAW_GATEWAY_NODE`               | (optional)        | Path tới Node.js 22.12+ nếu cần dùng thay Electron              |
+| `OPENCLAW_DIR` / `OPENCLAW_STATE_DIR` | backend/config.ts | Thư mục config openclaw                                         |
+| `OPENCLAW_WORKSPACE`                  | backend/config.ts | Thư mục workspace                                               |
 
 ### Thư mục dữ liệu người dùng (KHÔNG vào bundle)
 
@@ -75,6 +75,7 @@ npm install
 ```
 
 `postinstall` tự động chạy `scripts/hoist-openclaw-ext-deps.mjs`:
+
 - Scan `node_modules/openclaw/dist/extensions/*/node_modules/`
 - Copy mỗi package lên `node_modules/openclaw/node_modules/` nếu chưa có
 - Kết quả: ~400 packages được hoist (Slack SDK, Telegram, Discord, Feishu, AWS SDK...)
@@ -96,6 +97,7 @@ npm run build:ts
 ```
 
 Compile `app/**/*.ts` → `dist/`:
+
 - `app/main/main.ts` → `dist/main/main.js`
 - `app/main/preload-control-ui.ts` → `dist/main/preload-control-ui.js`
 - `app/backend/start.ts` → `dist/backend/start.js`
@@ -109,7 +111,7 @@ npm run dist:nsis
 npm run dist:installer
 ```
 
-Output: `release/OpenClaw-1Click-Setup-<version>.exe` (~396MB với `asar: false`)
+Output: `release/OpenClaw-Desktop-Setup-<version>.exe` (~396MB với `asar: false`)
 
 ---
 
@@ -119,7 +121,7 @@ Output: `release/OpenClaw-1Click-Setup-<version>.exe` (~396MB với `asar: false
 appId: dev.openclaw.desktop
 productName: OpenClaw
 executableName: OpenClaw
-asar: false        # BẮT BUỘC — xem VẤN ĐỀ 2 bên dưới
+asar: false # BẮT BUỘC — xem VẤN ĐỀ 2 bên dưới
 
 files:
   - dist/**/*
@@ -171,11 +173,13 @@ files:
 **Nguyên nhân:** `node-llama-cpp` là `peerDependency` của openclaw, npm v7+ **không** tự install peerDependencies.
 
 **Giải pháp:** Thêm vào `optionalDependencies` trong `package.json` (đã làm):
+
 ```json
 "optionalDependencies": {
   "node-llama-cpp": "3.18.1"
 }
 ```
+
 Nếu không dùng tính năng local LLM thì openclaw degrade gracefully.
 
 ---
@@ -183,6 +187,7 @@ Nếu không dùng tính năng local LLM thì openclaw degrade gracefully.
 ### VẤN ĐỀ 2: `asar: true` làm gateway crash `Unable to open bundled plugin public surface`
 
 **Triệu chứng:** Gateway không start, log hiện:
+
 ```
 Error: Unable to open bundled plugin public surface ollama/runtime-api.js
   at loadBundledPluginPublicSurfaceModuleSync (
@@ -194,28 +199,36 @@ Error: Unable to open bundled plugin public surface ollama/runtime-api.js
 
 **Lớp 1 — `O_NOFOLLOW` không được hỗ trợ trong ASAR virtual FS:**
 File `node_modules/openclaw/dist/boundary-file-read-CdxVvait.js` gọi:
+
 ```js
-fs.openSync(path, O_NOFOLLOW)   // ← flag này
-fs.realpathSync(path)
-fs.lstatSync(path)
+fs.openSync(path, O_NOFOLLOW); // ← flag này
+fs.realpathSync(path);
+fs.lstatSync(path);
 ```
+
 Electron's ASAR virtual FS **không implement `O_NOFOLLOW`** → `openSync` throw exception.
 
 **Lớp 2 — `import.meta.url` trả về ASAR path kể cả khi `asarUnpack`:**
 openclaw là ESM module. Khi file ở trong `asarUnpack`, Electron tạo entry trong `app.asar` nhưng `import.meta.url` vẫn trả về path ASAR ảo:
+
 ```
 file:///path/resources/app.asar/node_modules/openclaw/dist/...
 ```
+
 thay vì:
+
 ```
 file:///path/resources/app.asar.unpacked/node_modules/openclaw/dist/...
 ```
+
 → `openBoundaryFileSync` gọi `fs.openSync(O_NOFOLLOW)` trên ASAR path ảo → crash.
 
 **Giải pháp:** Dùng `asar: false` (bắt buộc với openclaw):
+
 ```yaml
 asar: false
 ```
+
 Không có workaround nào cho vấn đề này — đây là giới hạn của Electron ASAR với ESM + `O_NOFOLLOW`.
 
 **Hậu quả:** Installer lớn hơn (~396MB) và cài đặt chậm hơn vì NSIS phải xử lý từng file riêng lẻ trong hàng chục nghìn file.
@@ -231,25 +244,25 @@ Không có workaround nào cho vấn đề này — đây là giới hạn của
 
 **Phân bố kích thước (đo thực tế):**
 
-| Package | Kích thước |
-|---|---|
+| Package              | Kích thước |
+| -------------------- | ---------- |
 | `openclaw` (toàn bộ) | **255 MB** |
-| `pdfjs-dist` | 39 MB |
-| `node-llama-cpp` | 32 MB |
-| `matrix-js-sdk` | 11 MB |
-| `playwright-core` | 10 MB |
-| `@aws-sdk` (tổng) | 9 MB |
+| `pdfjs-dist`         | 39 MB      |
+| `node-llama-cpp`     | 32 MB      |
+| `matrix-js-sdk`      | 11 MB      |
+| `playwright-core`    | 10 MB      |
+| `@aws-sdk` (tổng)    | 9 MB       |
 
 **Giải pháp áp dụng — file exclusions trong `electron-builder.yml`:**
 
-| Exclusion | Lý do | Ước tính tiết kiệm |
-|---|---|---|
-| `extensions/*/node_modules/**` | Đã hoist lên `openclaw/node_modules/` | ~150MB |
-| `node-llama-cpp/llama/**` | Prebuilt model runners — user tự config | ~28MB |
-| `pdfjs-dist/web/**` + `types/**` | Web viewer demo + TS types | ~15MB |
-| `playwright-core/lib/server/chromium/**` | Browser driver | ~8MB |
-| `**/*.d.ts` | TypeScript declarations | ~5MB |
-| `**/*.test.js`, `**/tests/**` | Test files | ~2MB |
+| Exclusion                                | Lý do                                   | Ước tính tiết kiệm |
+| ---------------------------------------- | --------------------------------------- | ------------------ |
+| `extensions/*/node_modules/**`           | Đã hoist lên `openclaw/node_modules/`   | ~150MB             |
+| `node-llama-cpp/llama/**`                | Prebuilt model runners — user tự config | ~28MB              |
+| `pdfjs-dist/web/**` + `types/**`         | Web viewer demo + TS types              | ~15MB              |
+| `playwright-core/lib/server/chromium/**` | Browser driver                          | ~8MB               |
+| `**/*.d.ts`                              | TypeScript declarations                 | ~5MB               |
+| `**/*.test.js`, `**/tests/**`            | Test files                              | ~2MB               |
 
 **Kết quả:** Installer giảm từ ~600MB+ xuống còn ~396MB.
 
@@ -260,6 +273,7 @@ Không có workaround nào cho vấn đề này — đây là giới hạn của
 ### VẤN ĐỀ 4: Gateway crash `Cannot find module`
 
 **Triệu chứng:** `openclaw-gateway.log` hiện:
+
 ```
 Error: Cannot find module '@buape/carbon'
 Error: Cannot find module '@larksuiteoapi/node-sdk'
@@ -271,6 +285,7 @@ Error: Cannot find module '@slack/web-api'
 **Giải pháp (2 tầng):**
 
 1. **`postinstall` hoist script** — chạy tự động qua `npm install`:
+
    ```powershell
    npm install  # tự động hoist ~400 packages extension
    ```
@@ -289,14 +304,17 @@ Error: Cannot find module '@slack/web-api'
 ### VẤN ĐỀ 5: Gateway crash `Node.js v22.12+ is required`
 
 **Triệu chứng:** `launcher.log` hiện:
+
 ```
 openclaw gateway exited code=1
 ```
+
 `openclaw-gateway.log` hiện: `Node.js v22.12+ is required`
 
 **Nguyên nhân:** openclaw dùng `--experimental-require-module` (chỉ có từ Node 22.12). Electron 35 ship Node 22.x — nếu dùng Electron cũ hơn (Node 20) → crash.
 
 **Giải pháp:** Dùng `electron@35.x` trở lên (đã pin trong `devDependencies`):
+
 ```json
 "electron": "35.7.5"
 ```
@@ -310,6 +328,7 @@ openclaw gateway exited code=1
 **Nguyên nhân:** Portable EXE tự giải nén vào `%TEMP%\...`. `process.execPath` trỏ tới path trong Temp → khi gateway cwd dùng `appRoot` (file .asar hoặc directory) → `spawn` lỗi ENOENT.
 
 **Giải pháp đã implement:**
+
 - `app/main/electron-runner.ts` → ưu tiên `app.getPath('exe')` thay `process.execPath` cho packaged apps
 - `app/shared/spawn-cwd.ts` → nếu `appRoot` kết thúc bằng `.asar` thì dùng `path.dirname(appRoot)` làm cwd
 
@@ -324,11 +343,13 @@ openclaw gateway exited code=1
 Hoặc: Electron phiên bản cũ đã cài giữ Named Pipe lock → phiên bản mới thấy lock → exit.
 
 **Giải pháp:** Không test bằng `win-unpacked` trực tiếp khi đã có bản cài. Thay vào đó:
+
 ```powershell
 # Uninstall bản cũ trước
 # Hoặc dùng --user-data-dir khác nhau
 OpenClaw.exe --user-data-dir="C:\tmp\oc-test"
 ```
+
 **Cách đúng:** Cài NSIS installer mới đè lên bản cũ, rồi chạy bản đã cài.
 
 ---
@@ -340,6 +361,7 @@ OpenClaw.exe --user-data-dir="C:\tmp\oc-test"
 **Nguyên nhân:** Electron `app.getName()` trả về `name` trong `package.json` (`"openclaw-electron"`), không phải `productName` trong `electron-builder.yml` (`"OpenClaw"`). `productName` chỉ ảnh hưởng tên file EXE và shortcuts.
 
 **Trạng thái:** Được xác nhận là hành vi mong muốn (data dir tách biệt khỏi tên hiển thị). Không cần fix. Log path đúng:
+
 ```
 %APPDATA%\openclaw-electron\logs\launcher.log
 %APPDATA%\openclaw-electron\logs\openclaw-gateway.log
@@ -384,18 +406,19 @@ C:\Users\Admin\AppData\Local\Programs\OpenClaw\
 
 ### Kết quả kiểm tra
 
-| Check | Kết quả | Ghi chú |
-|---|---|---|
-| App launches | **PASS** | 6 OpenClaw.exe processes |
-| `launcher.log` — không có early crash | **PASS** | "Gateway is listening on 127.0.0.1:18789" |
-| Gateway starts | **PASS** | `ready (5 plugins, 25.1s)` |
-| `openclaw-gateway.log` — không có `Cannot find module` | **PASS** | |
-| `openclaw-gateway.log` — không có `Unable to open bundled plugin` | **PASS** | |
-| Port 18789 listening | **PASS** | `TCP 127.0.0.1:18789 LISTENING` + 6 connections |
-| Control UI signal | **PASS** | `browser control listening on http://127.0.0.1:18791/` |
-| WebSocket RPC | **PASS** | `[ws] webchat connected`, `skills.status`, `models.list` thành công |
+| Check                                                             | Kết quả  | Ghi chú                                                             |
+| ----------------------------------------------------------------- | -------- | ------------------------------------------------------------------- |
+| App launches                                                      | **PASS** | 6 OpenClaw.exe processes                                            |
+| `launcher.log` — không có early crash                             | **PASS** | "Gateway is listening on 127.0.0.1:18789"                           |
+| Gateway starts                                                    | **PASS** | `ready (5 plugins, 25.1s)`                                          |
+| `openclaw-gateway.log` — không có `Cannot find module`            | **PASS** |                                                                     |
+| `openclaw-gateway.log` — không có `Unable to open bundled plugin` | **PASS** |                                                                     |
+| Port 18789 listening                                              | **PASS** | `TCP 127.0.0.1:18789 LISTENING` + 6 connections                     |
+| Control UI signal                                                 | **PASS** | `browser control listening on http://127.0.0.1:18791/`              |
+| WebSocket RPC                                                     | **PASS** | `[ws] webchat connected`, `skills.status`, `models.list` thành công |
 
 ### Log xác nhận (launcher.log)
+
 ```
 [2026-04-12T19:36:27.179Z] [launcher] Starting OpenClaw gateway on port 18789 (node: Electron)
 [2026-04-12T19:37:39.511Z] [launcher] Gateway is listening on 127.0.0.1:18789
@@ -403,6 +426,7 @@ C:\Users\Admin\AppData\Local\Programs\OpenClaw\
 ```
 
 ### Log xác nhận (openclaw-gateway.log)
+
 ```
 [gateway] loading configuration…
 [gateway] resolving authentication…
@@ -419,18 +443,22 @@ C:\Users\Admin\AppData\Local\Programs\OpenClaw\
 ## 7. Checklist kiểm tra sau build
 
 ### Kiểm tra file output
+
 ```
-release/OpenClaw-1Click-Setup-<version>.exe   ← NSIS installer (~396MB)
+release/OpenClaw-Desktop-Setup-<version>.exe   ← NSIS installer (~396MB)
 release/builder-debug.yml                     ← Debug config
 release/builder-effective-config.yaml         ← Effective config (xuất hiện sau build)
 ```
 
 ### Kiểm tra `builder-effective-config.yaml`
+
 Sau build, xác nhận:
+
 - `asar: false`
 - `files` có exclude `*.map`, `.tmp-openclaw-upstream`, `extensions/*/node_modules`
 
 ### Smoke test sau cài đặt
+
 1. **Cài NSIS installer** đè lên bản cũ (quan trọng — xem VẤN ĐỀ 7)
 2. **App mở được** → Control UI hiện trong cửa sổ
 3. **`launcher.log`** không có `gateway exited code=1` lặp lại
@@ -440,13 +468,14 @@ Sau build, xác nhận:
 7. **`launcher-ready.json`** tồn tại trong `%APPDATA%\openclaw-electron\`
 
 ### Script kiểm tra modules bị thiếu (chạy trước build)
+
 ```js
 // Paste vào Node.js REPL
-const pkg = require('./package.json');
-const fs = require('fs');
-const all = {...pkg.dependencies, ...pkg.optionalDependencies};
-Object.keys(all).forEach(p => {
-  if (!fs.existsSync('node_modules/' + p)) console.log('MISSING:', p);
+const pkg = require("./package.json");
+const fs = require("fs");
+const all = { ...pkg.dependencies, ...pkg.optionalDependencies };
+Object.keys(all).forEach((p) => {
+  if (!fs.existsSync("node_modules/" + p)) console.log("MISSING:", p);
 });
 ```
 
@@ -454,16 +483,16 @@ Object.keys(all).forEach(p => {
 
 ## 8. Troubleshooting nhanh
 
-| Lỗi trong log | Nguyên nhân | Fix |
-|---|---|---|
-| `Cannot find module 'X'` | Package chưa hoist hoặc thiếu trong deps | Chạy lại `npm install`, kiểm tra `node_modules/openclaw/node_modules/X` |
-| `Unable to open bundled plugin public surface` | ASAR block `O_NOFOLLOW` | Đảm bảo `asar: false` trong `electron-builder.yml` |
-| `Node.js v22.12+ is required` | Electron Node version quá cũ | Dùng `electron@35+` hoặc set `OPENCLAW_GATEWAY_NODE` |
-| `gateway exited code=1` ngay lập tức | Xem `openclaw-gateway.log` để biết lý do thực | Thường là module missing hoặc Node version |
-| Cửa sổ trắng | Gateway chưa ready hoặc crash sớm | Xem `launcher.log` |
-| Spawn ENOENT (portable) | `cwd` trỏ vào file .asar thay vì directory | Đã fix trong `spawn-cwd.ts` |
-| Exit code 9 ngay lập tức | Single instance lock từ bản đã cài | Cài lại NSIS installer mới (đè bản cũ) |
-| Build quá chậm | `asar: false` + node_modules quá lớn | Đã tối ưu với exclusions — không thể dùng `asar: true` |
+| Lỗi trong log                                  | Nguyên nhân                                   | Fix                                                                     |
+| ---------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------- |
+| `Cannot find module 'X'`                       | Package chưa hoist hoặc thiếu trong deps      | Chạy lại `npm install`, kiểm tra `node_modules/openclaw/node_modules/X` |
+| `Unable to open bundled plugin public surface` | ASAR block `O_NOFOLLOW`                       | Đảm bảo `asar: false` trong `electron-builder.yml`                      |
+| `Node.js v22.12+ is required`                  | Electron Node version quá cũ                  | Dùng `electron@35+` hoặc set `OPENCLAW_GATEWAY_NODE`                    |
+| `gateway exited code=1` ngay lập tức           | Xem `openclaw-gateway.log` để biết lý do thực | Thường là module missing hoặc Node version                              |
+| Cửa sổ trắng                                   | Gateway chưa ready hoặc crash sớm             | Xem `launcher.log`                                                      |
+| Spawn ENOENT (portable)                        | `cwd` trỏ vào file .asar thay vì directory    | Đã fix trong `spawn-cwd.ts`                                             |
+| Exit code 9 ngay lập tức                       | Single instance lock từ bản đã cài            | Cài lại NSIS installer mới (đè bản cũ)                                  |
+| Build quá chậm                                 | `asar: false` + node_modules quá lớn          | Đã tối ưu với exclusions — không thể dùng `asar: true`                  |
 
 ---
 

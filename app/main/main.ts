@@ -29,6 +29,12 @@ import {
 import { ENV_DATA_ROOT, ENV_DESKTOP_RESOURCES } from "../backend/config";
 import { resolveWindowIconPath } from "./app-icon";
 import { resolveElectronRunnerPath } from "./electron-runner";
+import {
+  isSplitModeReady,
+  updateBackendLayers,
+  BACKEND_LAYER_UPDATE_EVENT,
+  type LayerUpdateState,
+} from "./layer-updater";
 
 const ENV_ELECTRON_RUNNER = "OPENCLAW_ELECTRON_RUNNER";
 
@@ -40,9 +46,16 @@ const MAIN_WINDOW_MIN_WIDTH = 1180;
 const MAIN_WINDOW_MIN_HEIGHT = 700;
 
 let mainWindow: BrowserWindow | null = null;
+/** WebSocket URL của gateway hiện tại — được set sau khi backend ready */
+let currentGatewayWsUrl: string | null = null;
 const DESKTOP_UPDATE_EVENT = "desktop:update-state";
 const UPDATE_NOTICE_URL =
   "https://raw.githubusercontent.com/mankhb2k/openclaw-1click/main/update/update-notice.json";
+
+/** URL của backend-manifest.json — commit vào repo openclaw-desktop nhánh main, thư mục release/ */
+const BACKEND_MANIFEST_URL =
+  process.env.OPENCLAW_BACKEND_MANIFEST_URL?.trim() ||
+  "https://raw.githubusercontent.com/mankhb2k/openclaw-desktop/main/release/backend-manifest.json";
 
 type DesktopUpdatePhase =
   | "idle"
@@ -168,7 +181,12 @@ async function fetchLocalizedUpdateNotice(params?: {
     }
     return {
       title: pickLocalizedNoticeField(table, locale, "title", params),
-      description: pickLocalizedNoticeField(table, locale, "description", params),
+      description: pickLocalizedNoticeField(
+        table,
+        locale,
+        "description",
+        params,
+      ),
     };
   } catch {
     return { title: null, description: null };
@@ -276,7 +294,8 @@ function initDesktopUpdater(): void {
       announcementTitle: null,
       announcementDescription: null,
       progressPercent: null,
-      message: "Auto-update chỉ hỗ trợ bản cài NSIS, không hỗ trợ bản portable.",
+      message:
+        "Auto-update chỉ hỗ trợ bản cài NSIS, không hỗ trợ bản portable.",
     });
     return;
   }
@@ -353,14 +372,17 @@ function initDesktopUpdater(): void {
     }
     setDesktopUpdateState({
       phase: "downloading",
-      progressPercent: Number.isFinite(progress.percent) ? progress.percent : null,
+      progressPercent: Number.isFinite(progress.percent)
+        ? progress.percent
+        : null,
     });
   });
   autoUpdater.on("update-downloaded", () => {
     setDesktopUpdateState({
       phase: "downloaded",
       progressPercent: 100,
-      message: "Bản cập nhật đã tải xong. Nhấn Update lần nữa để cài đặt và khởi động lại.",
+      message:
+        "Bản cập nhật đã tải xong. Nhấn Update lần nữa để cài đặt và khởi động lại.",
     });
   });
   autoUpdater.on("error", (error) => {
@@ -395,6 +417,13 @@ function getDataRoot(): string {
   return app.getPath("userData");
 }
 
+function resolveSetupHtmlPath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "resources", "setup.html");
+  }
+  return path.resolve(getProjectRoot(), "resources", "setup.html");
+}
+
 function packagedDevtoolsFlagPaths(): string[] {
   const raw: string[] = [];
   const portableDir = process.env[ENV_PORTABLE_EXE_DIR]?.trim();
@@ -406,7 +435,9 @@ function packagedDevtoolsFlagPaths(): string[] {
     raw.push(path.join(path.dirname(portableFile), PACKAGED_DEVTOOLS_FLAG));
   }
   try {
-    raw.push(path.join(path.dirname(app.getPath("exe")), PACKAGED_DEVTOOLS_FLAG));
+    raw.push(
+      path.join(path.dirname(app.getPath("exe")), PACKAGED_DEVTOOLS_FLAG),
+    );
   } catch {
     /* ignore */
   }
@@ -463,7 +494,10 @@ function readReadyState(dataRoot: string): {
   return { controlUiUrl, gatewayPort: parsed.gatewayPort };
 }
 
-async function waitForLauncherReady(dataRoot: string, timeoutMs: number): Promise<void> {
+async function waitForLauncherReady(
+  dataRoot: string,
+  timeoutMs: number,
+): Promise<void> {
   const readyFile = path.join(dataRoot, "launcher-ready.json");
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -500,8 +534,18 @@ async function ensureBackendAndGetUrl(dataRoot: string): Promise<string> {
 
 function startBackendLauncher(dataRoot: string): void {
   const startScript = path.join(__dirname, "..", "backend", "start.js");
-  const appRoot = getProjectRoot();
+
+  // Split mode (RULE-06): nếu backend/ đã được extract vào userData, dùng nó thay vì bundled app.
+  // isSplitModeReady() kiểm tra xem openclaw.mjs có tồn tại trong dataRoot/backend/ không.
+  const splitReady = app.isPackaged && isSplitModeReady(dataRoot);
+  const appRoot = splitReady
+    ? path.join(dataRoot, "backend")
+    : getProjectRoot();
   const cliScript = resolveOpenClawCliScript(appRoot);
+
+  if (splitReady) {
+    console.log("[main] Split mode: using backend from", appRoot);
+  }
 
   fs.mkdirSync(dataRoot, { recursive: true });
 
@@ -527,7 +571,9 @@ function startBackendLauncher(dataRoot: string): void {
       [ENV_DATA_ROOT]: dataRoot,
       OPENCLAW_APP_ROOT: appRoot,
       OPENCLAW_CLI_SCRIPT: cliScript,
-      OPENCLAW_SEED_WORKSPACE: fs.existsSync(seedWorkspace) ? seedWorkspace : "",
+      OPENCLAW_SEED_WORKSPACE: fs.existsSync(seedWorkspace)
+        ? seedWorkspace
+        : "",
       [ENV_ELECTRON_RUNNER]: electronRunner,
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -545,6 +591,36 @@ function startBackendLauncher(dataRoot: string): void {
   });
 }
 
+/**
+ * Chạy background check và (nếu cần) download 2-layer backend update.
+ * Gọi sau khi gateway đã sẵn sàng để không block startup.
+ * Progress được forward tới renderer qua IPC (BACKEND_LAYER_UPDATE_EVENT).
+ */
+function scheduleBackendLayerCheck(dataRoot: string): void {
+  if (!app.isPackaged) return; // chỉ chạy ở packaged mode
+
+  // Delay 10 giây sau startup để UI load xong trước
+  setTimeout(() => {
+    void updateBackendLayers({
+      dataRoot,
+      manifestUrl: BACKEND_MANIFEST_URL,
+      appVersion: app.getVersion(),
+      electronVersion: process.versions.electron ?? "35.7.5",
+      projectRoot: getProjectRoot(),
+      onProgress: (state: LayerUpdateState) => {
+        console.log(
+          "[layer-update]",
+          state.phase,
+          state.message ?? state.error ?? "",
+        );
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send(BACKEND_LAYER_UPDATE_EVENT, state);
+        }
+      },
+    });
+  }, 10_000).unref();
+}
+
 async function openControlUiInBrowser(): Promise<void> {
   const dataRoot = getDataRoot();
   const readyPath = path.join(dataRoot, "launcher-ready.json");
@@ -560,14 +636,20 @@ async function openControlUiInBrowser(): Promise<void> {
     ({ controlUiUrl } = readReadyState(dataRoot));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    dialog.showErrorBox("OpenClaw Control UI", `Could not read launcher state: ${msg}`);
+    dialog.showErrorBox(
+      "OpenClaw Control UI",
+      `Could not read launcher state: ${msg}`,
+    );
     return;
   }
   try {
     await shell.openExternal(controlUiUrl);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    dialog.showErrorBox("OpenClaw Control UI", `Could not open browser: ${msg}`);
+    dialog.showErrorBox(
+      "OpenClaw Control UI",
+      `Could not open browser: ${msg}`,
+    );
   }
 }
 
@@ -622,7 +704,9 @@ function registerGlobalShortcuts(): void {
     void openControlUiInBrowser();
   });
   if (!registered) {
-    console.warn("[main] Could not register global shortcut CommandOrControl+Shift+O");
+    console.warn(
+      "[main] Could not register global shortcut CommandOrControl+Shift+O",
+    );
   }
 }
 
@@ -635,7 +719,10 @@ function isHttpOrHttpsUrl(raw: string): boolean {
   }
 }
 
-function wireControlUiExternalLinks(wc: WebContents, controlUiUrl: string): void {
+function wireControlUiExternalLinks(
+  wc: WebContents,
+  controlUiUrl: string,
+): void {
   wc.setWindowOpenHandler(({ url }) => {
     if (isHttpOrHttpsUrl(url)) {
       void shell.openExternal(url);
@@ -667,6 +754,11 @@ function wireControlUiExternalLinks(wc: WebContents, controlUiUrl: string): void
 }
 
 function registerDesktopUpdateHandler(): void {
+  // Synchronous gateway URL query from preload (used by forked control-ui)
+  ipcMain.removeAllListeners("desktop:get-gateway-url");
+  ipcMain.on("desktop:get-gateway-url", (event) => {
+    event.returnValue = currentGatewayWsUrl ?? "";
+  });
   ipcMain.removeHandler("desktop:run-update-openclaw");
   ipcMain.removeHandler("desktop:update:get-state");
   ipcMain.removeHandler("desktop:update:check");
@@ -690,12 +782,16 @@ function registerDesktopUpdateHandler(): void {
       if (!isElectronUpdaterEnabled()) {
         return {
           ok: false as const,
-          error: "Auto-update chỉ hỗ trợ bản cài NSIS. Bản portable vui lòng tải bản mới từ GitHub Releases.",
+          error:
+            "Auto-update chỉ hỗ trợ bản cài NSIS. Bản portable vui lòng tải bản mới từ GitHub Releases.",
         };
       }
       if (desktopUpdateState.phase === "downloaded") {
         installDesktopUpdate();
-        return { ok: true as const, message: "Đang cài đặt bản mới và khởi động lại ứng dụng." };
+        return {
+          ok: true as const,
+          message: "Đang cài đặt bản mới và khởi động lại ứng dụng.",
+        };
       }
       await downloadDesktopUpdate();
       return {
@@ -709,7 +805,10 @@ function registerDesktopUpdateHandler(): void {
     const appRoot = getProjectRoot();
     const pkgPath = path.join(appRoot, "package.json");
     if (!fs.existsSync(pkgPath)) {
-      return { ok: false as const, error: "Không tìm thấy package.json tại thư mục ứng dụng." };
+      return {
+        ok: false as const,
+        error: "Không tìm thấy package.json tại thư mục ứng dụng.",
+      };
     }
     return await new Promise<
       | { ok: true; message?: string }
@@ -731,11 +830,22 @@ function registerDesktopUpdateHandler(): void {
         stdout += c.toString();
         if (stdout.length > 16_000) stdout = stdout.slice(-16_000);
       });
-      child.on("error", (err) => { resolve({ ok: false, error: err.message }); });
+      child.on("error", (err) => {
+        resolve({ ok: false, error: err.message });
+      });
       child.on("close", (code) => {
-        if (code === 0) { resolve({ ok: true }); return; }
-        const tail = (stderr.trim() || stdout.trim() || `exit ${code}`).slice(-4000);
-        resolve({ ok: false, error: `npm run update:openclaw thất bại (mã ${code}).`, stderrTail: tail });
+        if (code === 0) {
+          resolve({ ok: true });
+          return;
+        }
+        const tail = (stderr.trim() || stdout.trim() || `exit ${code}`).slice(
+          -4000,
+        );
+        resolve({
+          ok: false,
+          error: `npm run update:openclaw thất bại (mã ${code}).`,
+          stderrTail: tail,
+        });
       });
     });
   });
@@ -758,9 +868,120 @@ function dashboardWindowTitle(): string {
   return `OpenClaw Dashboard v${app.getVersion()}`;
 }
 
+// ── First-run setup flow ──────────────────────────────────────────────────────
+
+/**
+ * Hiện setup window và chờ user bấm "Tải backend".
+ * Sau khi download + extract xong, navigate sang Control UI bình thường.
+ */
+async function runSetupFlow(dataRoot: string): Promise<void> {
+  const windowIcon = resolveWindowIconPath();
+  mainWindow = new BrowserWindow({
+    width: 520,
+    height: 420,
+    resizable: false,
+    show: false,
+    backgroundColor: "#0e1015",
+    title: "OpenClaw Desktop — Setup",
+    ...(process.platform === "win32"
+      ? { icon: nativeImage.createEmpty() }
+      : windowIcon
+        ? { icon: windowIcon }
+        : {}),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, "setup-preload.js"),
+    },
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+
+  mainWindow.once("ready-to-show", () => mainWindow?.show());
+  await mainWindow.loadFile(resolveSetupHtmlPath());
+  mainWindow.setProgressBar(0);
+
+  // Lắng nghe nút "Tải backend" — once để tránh duplicate
+  ipcMain.once("setup:start-download", () => {
+    void performInitialDownload(dataRoot);
+  });
+}
+
+/**
+ * Download + extract backend layers, sau đó navigate sang Control UI.
+ * Gọi sau khi user bấm nút trong setup window.
+ */
+async function performInitialDownload(dataRoot: string): Promise<void> {
+  function sendProgress(state: LayerUpdateState): void {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send("setup:progress", state);
+    if (typeof state.progressPercent === "number") {
+      mainWindow.setProgressBar(state.progressPercent / 100);
+    }
+  }
+
+  try {
+    await updateBackendLayers({
+      dataRoot,
+      manifestUrl: BACKEND_MANIFEST_URL,
+      appVersion: app.getVersion(),
+      electronVersion: process.versions.electron ?? "35.7.5",
+      projectRoot: getProjectRoot(),
+      onProgress: sendProgress,
+    });
+
+    mainWindow?.setProgressBar(-1);
+
+    // Backend ready → khởi động gateway và load Control UI
+    const controlUiUrl = await ensureBackendAndGetUrl(dataRoot);
+    currentGatewayWsUrl = controlUiUrl.replace(
+      /^http(s?):\/\//,
+      (_, s) => `ws${s}://`,
+    );
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      // Chuyển sang kích thước bình thường
+      mainWindow.setResizable(true);
+      mainWindow.setSize(1280, 800);
+      mainWindow.setMinimumSize(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT);
+      mainWindow.setTitle(dashboardWindowTitle());
+      mainWindow.on("page-title-updated", (e) => {
+        e.preventDefault();
+        mainWindow?.setTitle(dashboardWindowTitle());
+      });
+      wireControlUiExternalLinks(mainWindow.webContents, controlUiUrl);
+      registerDesktopUpdateHandler();
+      await mainWindow.loadURL(controlUiUrl);
+      publishDesktopUpdateState();
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[setup] performInitialDownload failed:", msg);
+    if (!mainWindow?.isDestroyed()) {
+      mainWindow?.setProgressBar(-1);
+      mainWindow?.webContents.send("setup:progress", {
+        phase: "error",
+        error: msg,
+        message: `Lỗi: ${msg}`,
+      });
+    }
+  }
+}
+
 async function createWindow(): Promise<void> {
   const dataRoot = getDataRoot();
+
+  // ── First-run: backend chưa được cài → hiện setup screen ──────────────
+  if (app.isPackaged && !isSplitModeReady(dataRoot)) {
+    await runSetupFlow(dataRoot);
+    return;
+  }
+
   const controlUiUrl = await ensureBackendAndGetUrl(dataRoot);
+  // Derive WebSocket gateway URL from controlUiUrl (http→ws, https→wss)
+  currentGatewayWsUrl = controlUiUrl.replace(/^http(s?):\/\//, (_, s) => `ws${s}://`);
 
   const windowIcon = resolveWindowIconPath();
   mainWindow = new BrowserWindow({
@@ -794,7 +1015,11 @@ async function createWindow(): Promise<void> {
     "did-fail-load",
     (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
       if (isMainFrame) {
-        console.error("[main] Control UI failed to load:", { errorCode, errorDescription, validatedURL });
+        console.error("[main] Control UI failed to load:", {
+          errorCode,
+          errorDescription,
+          validatedURL,
+        });
       }
     },
   );
@@ -805,7 +1030,11 @@ async function createWindow(): Promise<void> {
     "console-message",
     (e: ElectronEvent<WebContentsConsoleMessageEventParams>) => {
       if (e.level === "warning" || e.level === "error") {
-        console.error("[control-ui]", e.message, e.sourceId ? `(${e.sourceId}:${e.lineNumber})` : "");
+        console.error(
+          "[control-ui]",
+          e.message,
+          e.sourceId ? `(${e.sourceId}:${e.lineNumber})` : "",
+        );
       }
     },
   );
@@ -859,10 +1088,14 @@ if (!gotLock) {
     void checkDesktopUpdates();
     buildApplicationMenu();
     registerGlobalShortcuts();
-    void createWindow().catch((err) => {
-      console.error(err);
-      app.quit();
-    });
+    void createWindow()
+      .then(() => {
+        scheduleBackendLayerCheck(getDataRoot());
+      })
+      .catch((err) => {
+        console.error(err);
+        app.quit();
+      });
   });
 
   app.on("activate", () => {

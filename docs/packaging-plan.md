@@ -53,10 +53,10 @@ Luồng hoạt động sau cài đặt:
 ```yaml
 appId: dev.openclaw.desktop
 productName: OpenClaw
-asar: false                      # Giữ false — lý do đã ghi trong file gốc
+asar: false # Giữ false — lý do đã ghi trong file gốc
 
 files:
-  - dist/**/*                    # JS đã biên dịch (main, backend, preload)
+  - dist/**/* # JS đã biên dịch (main, backend, preload)
   - assets/icon.ico
   - package.json
   # KHÔNG có node_modules/**/* — đây là điểm mấu chốt
@@ -75,13 +75,13 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   allowElevation: true
-  include: installer/custom.nsh   # Script NSH tùy chỉnh (xem mục 6)
+  include: installer/custom.nsh # Script NSH tùy chỉnh (xem mục 6)
   artifactName: "${productName}-Setup-${version}.${ext}"
 
 publish:
   provider: github
   owner: Mankhb2k
-  repo: openclaw-1click
+  repo: openclaw-desktop
 ```
 
 ### 2.2 Build pipeline
@@ -122,7 +122,7 @@ fs.writeFileSync('release/backend-manifest.json', JSON.stringify({
   version: '${VERSION}',
   backendVersion: require('./node_modules/openclaw/package.json').version,
   sha256: hash,
-  url: 'https://github.com/Mankhb2k/openclaw-1click/releases/download/v${VERSION}/backend-bundle-v${VERSION}.tar.gz'
+  url: 'https://github.com/mankhb2k/openclaw-desktop/releases/download/v${VERSION}/backend-bundle-v${VERSION}.tar.gz'
 }));
 "
 ```
@@ -215,18 +215,18 @@ mainWindow.webContents.send('setup:progress', {
 // app/main/updater.ts
 async function checkAllUpdates() {
   // Update 1: Electron shell (đã có trong main.ts)
-  await checkDesktopUpdates()  // dùng electron-updater
+  await checkDesktopUpdates(); // dùng electron-updater
 
   // Update 2: Backend bundle
-  const manifest = await fetchBackendManifest()
-  const installed = readInstalledBackendVersion(dataRoot)
-  
+  const manifest = await fetchBackendManifest();
+  const installed = readInstalledBackendVersion(dataRoot);
+
   if (manifest.version !== installed.version) {
-    sendToRenderer('backend:update-available', {
+    sendToRenderer("backend:update-available", {
       currentVersion: installed.backendVersion,
       newVersion: manifest.backendVersion,
       size: manifest.compressedSize,
-    })
+    });
   }
 }
 ```
@@ -253,10 +253,10 @@ User bấm "Cập nhật ngay"
 ```typescript
 // Nếu gateway không start được sau 30s:
 async function rollbackBackend() {
-  await treeKill(gatewayChild.pid)
-  fs.renameSync(backendDir, backendBrokenDir)
-  fs.renameSync(backendOldDir, backendDir)  // restore backup
-  startBackendLauncher(dataRoot)
+  await treeKill(gatewayChild.pid);
+  fs.renameSync(backendDir, backendBrokenDir);
+  fs.renameSync(backendOldDir, backendDir); // restore backup
+  startBackendLauncher(dataRoot);
 }
 ```
 
@@ -266,20 +266,20 @@ async function rollbackBackend() {
 
 ### 5.1 Bảng so sánh
 
-| Tiêu chí | Full-Bundle (hiện tại) | Split (đề xuất) |
-|---|---|---|
-| **Kích thước installer** | ~500–800 MB | ~50–80 MB |
-| **Tốc độ tải lần đầu** | Chậm (1 file lớn) | Tổng bằng nhau, nhưng UX tốt hơn |
-| **Cài đặt offline** | Hoàn toàn offline | Cần internet lần đầu |
-| **Update Electron shell** | Tải toàn bộ EXE mới | Tải EXE delta nhỏ |
-| **Update backend** | Phải tải toàn bộ EXE mới | Tải chỉ backend-bundle |
-| **Phức tạp kỹ thuật** | Đơn giản | Phức tạp hơn đáng kể |
-| **Điểm lỗi** | Ít | Nhiều hơn (download, verify, extract) |
-| **Trải nghiệm user** | Cài 1 lần, chạy ngay | Phải đợi download lần đầu |
-| **Antivirus / SmartScreen** | Hay bị flag vì EXE lớn | EXE nhỏ ít bị flag hơn |
-| **Vá bảo mật nhanh** | Deploy lại toàn bộ | Update backend riêng không cần restart toàn bộ |
-| **Quản lý phiên bản** | 1 version duy nhất | 2 version (shell + backend) |
-| **Tương thích openclaw ESM** | Đã xử lý (asar: false) | Giữ nguyên, không ảnh hưởng |
+| Tiêu chí                     | Full-Bundle (hiện tại)   | Split (đề xuất)                                |
+| ---------------------------- | ------------------------ | ---------------------------------------------- |
+| **Kích thước installer**     | ~500–800 MB              | ~50–80 MB                                      |
+| **Tốc độ tải lần đầu**       | Chậm (1 file lớn)        | Tổng bằng nhau, nhưng UX tốt hơn               |
+| **Cài đặt offline**          | Hoàn toàn offline        | Cần internet lần đầu                           |
+| **Update Electron shell**    | Tải toàn bộ EXE mới      | Tải EXE delta nhỏ                              |
+| **Update backend**           | Phải tải toàn bộ EXE mới | Tải chỉ backend-bundle                         |
+| **Phức tạp kỹ thuật**        | Đơn giản                 | Phức tạp hơn đáng kể                           |
+| **Điểm lỗi**                 | Ít                       | Nhiều hơn (download, verify, extract)          |
+| **Trải nghiệm user**         | Cài 1 lần, chạy ngay     | Phải đợi download lần đầu                      |
+| **Antivirus / SmartScreen**  | Hay bị flag vì EXE lớn   | EXE nhỏ ít bị flag hơn                         |
+| **Vá bảo mật nhanh**         | Deploy lại toàn bộ       | Update backend riêng không cần restart toàn bộ |
+| **Quản lý phiên bản**        | 1 version duy nhất       | 2 version (shell + backend)                    |
+| **Tương thích openclaw ESM** | Đã xử lý (asar: false)   | Giữ nguyên, không ảnh hưởng                    |
 
 ### 5.2 Ưu điểm của Split
 
@@ -309,13 +309,13 @@ async function rollbackBackend() {
 !macro customInstall
   ; Tạo thư mục data root
   CreateDirectory "$APPDATA\OpenClaw"
-  
+
   ; Ghi registry cho uninstaller
   WriteRegStr HKCU "Software\OpenClaw" "DataRoot" "$APPDATA\OpenClaw"
-  
+
   ; Tùy chọn: detect Node.js version nếu muốn dùng system node
   ExecWait 'node --version' $0
-  
+
   ; Tùy chọn: check .NET hoặc VC++ Redist nếu cần
 !macroend
 
@@ -329,14 +329,14 @@ async function rollbackBackend() {
 
 ### 6.2 Giới hạn của NSIS trong kịch bản này
 
-| Việc | NSIS làm được? | Ghi chú |
-|---|---|---|
-| Cài file EXE nhỏ | Có | Dễ dàng |
-| Tải file từ internet trong quá trình cài | Có (NSISdl) | Nhưng UX xấu, không có progress đẹp |
-| Verify SHA-256 | Có (Crypto plugin) | Cần thêm plugin |
-| Giải nén .tar.gz | Không trực tiếp | NSIS chỉ hiểu .zip và .7z; cần dùng tar.exe (Windows 10+) hoặc 7-zip plugin |
-| Fallback nếu tải lỗi | Phức tạp | Logic NSIS cồng kềnh |
-| **Khuyến nghị** | **Để Electron làm** | NSIS chỉ cài EXE; Electron xử lý download+extract |
+| Việc                                     | NSIS làm được?      | Ghi chú                                                                     |
+| ---------------------------------------- | ------------------- | --------------------------------------------------------------------------- |
+| Cài file EXE nhỏ                         | Có                  | Dễ dàng                                                                     |
+| Tải file từ internet trong quá trình cài | Có (NSISdl)         | Nhưng UX xấu, không có progress đẹp                                         |
+| Verify SHA-256                           | Có (Crypto plugin)  | Cần thêm plugin                                                             |
+| Giải nén .tar.gz                         | Không trực tiếp     | NSIS chỉ hiểu .zip và .7z; cần dùng tar.exe (Windows 10+) hoặc 7-zip plugin |
+| Fallback nếu tải lỗi                     | Phức tạp            | Logic NSIS cồng kềnh                                                        |
+| **Khuyến nghị**                          | **Để Electron làm** | NSIS chỉ cài EXE; Electron xử lý download+extract                           |
 
 ### 6.3 Kiến trúc khuyến nghị với NSIS
 
@@ -379,7 +379,7 @@ nsis:
 #### a) GitHub Releases phải có đủ 3 artifacts mỗi release
 
 ```
-openclaw-1click / releases / vX.Y.Z /
+openclaw-desktop / releases / vX.Y.Z /
   ├── OpenClaw-Setup-X.Y.Z.exe          # NSIS installer
   ├── OpenClaw-Setup-X.Y.Z.exe.blockmap # delta update
   ├── latest.yml                         # electron-updater manifest
@@ -412,20 +412,20 @@ openclaw-1click / releases / vX.Y.Z /
 
 ```typescript
 // Không extract thẳng vào backend/, tránh partial state
-const tempDir = path.join(dataRoot, `backend-extract-${Date.now()}`)
-await extractTarGz(bundlePath, tempDir)
-await verifyExtract(tempDir)  // kiểm tra openclaw/openclaw.mjs tồn tại
-fs.renameSync(tempDir, backendDir)  // atomic rename
+const tempDir = path.join(dataRoot, `backend-extract-${Date.now()}`);
+await extractTarGz(bundlePath, tempDir);
+await verifyExtract(tempDir); // kiểm tra openclaw/openclaw.mjs tồn tại
+fs.renameSync(tempDir, backendDir); // atomic rename
 ```
 
 #### e) ENV_APP_ROOT phải trỏ đúng thư mục backend
 
 ```typescript
 // Trong startBackendLauncher(), thay vì:
-OPENCLAW_APP_ROOT: appRoot  // trỏ vào Program Files
+OPENCLAW_APP_ROOT: appRoot; // trỏ vào Program Files
 
 // Dùng:
-OPENCLAW_APP_ROOT: path.join(dataRoot, 'backend')  // trỏ vào %APPDATA%
+OPENCLAW_APP_ROOT: path.join(dataRoot, "backend"); // trỏ vào %APPDATA%
 ```
 
 ### 7.2 Yêu cầu về UX
@@ -445,10 +445,10 @@ jobs:
     steps:
       - name: Build Electron EXE
         run: npm run dist:nsis
-      
+
       - name: Pack backend bundle
         run: node scripts/pack-backend-bundle.mjs
-      
+
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -504,12 +504,12 @@ jobs:
 
 **Nên chọn phương án nào?**
 
-| Tình huống | Khuyến nghị |
-|---|---|
-| User cần cài offline / airgap | Full-Bundle (hiện tại) |
-| Muốn installer nhỏ, update backend nhanh | Split |
-| Team nhỏ, ưu tiên đơn giản | Full-Bundle |
-| Cần hotfix openclaw gateway nhanh | Split |
-| Kết hợp tốt nhất | Split installer + giữ Full-Bundle portable option |
+| Tình huống                               | Khuyến nghị                                       |
+| ---------------------------------------- | ------------------------------------------------- |
+| User cần cài offline / airgap            | Full-Bundle (hiện tại)                            |
+| Muốn installer nhỏ, update backend nhanh | Split                                             |
+| Team nhỏ, ưu tiên đơn giản               | Full-Bundle                                       |
+| Cần hotfix openclaw gateway nhanh        | Split                                             |
+| Kết hợp tốt nhất                         | Split installer + giữ Full-Bundle portable option |
 
 **Với cấu hình NSIS hiện tại của dự án** (`oneClick: false`, `allowElevation: true`, `electron-updater` đã setup), phương án Split là **khả thi 100%** — chỉ cần thêm ~400 dòng TypeScript cho download/extract engine và không cần thay đổi cấu hình NSIS đáng kể.

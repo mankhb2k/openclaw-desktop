@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-04-14T09:43:50.142Z",
+  "electronVersion": "35.7.5",
+  "platform": "win32",
+  "arch": "x64",
+  "layers": {
+    "root-runtime": {
+      "version": "1",
+      "sha256": "7472ebfe86a6feed260ad8354c1827e3197f54f3efd7d115a35ec0eef96a1946",
+      "url": "https://github.com/Mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-root-runtime-v1.tar.gz",
+      "compressedBytes": 298470,
+      "uncompressedBytes": 0,
+      "extractTo": "node_modules",
+      "requiresHoist": false,
+      "changedFrom": null
+    },
+    "openclaw": {
+      "version": "2026.4.5",
+      "sha256": "41251e66197714b02b740b4b704137278cf46f56bf8d3aa943e69943b7e199f5",
+      "url": "https://github.com/Mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-openclaw-v2026.4.5.tar.gz",
+      "compressedBytes": 28010870,
+      "uncompressedBytes": 0,
+      "extractTo": "node_modules",
+      "requiresHoist": true,
+      "hoistScript": "scripts/hoist-openclaw-ext-deps.mjs",
+      "changedFrom": null
+    }
+  },
+  "extractOrder": [
+    "root-runtime",
+    "openclaw"
+  ],
+  "minAppVersion": "1.0.0",
+  "releaseNotes": {
+    "vi": "Cập nhật openclaw lên 2026.4.5",
+    "en": "Update openclaw to 2026.4.5"
+  }
+}

@@ -16,6 +16,7 @@ export type DesktopUpdateState = {
 };
 
 contextBridge.exposeInMainWorld('openclawDesktop', {
+  getGatewayUrl: (): string => ipcRenderer.sendSync('desktop:get-gateway-url') as string,
   runUpdateOpenclaw: (): Promise<RunUpdateOpenclawResult> =>
     ipcRenderer.invoke('desktop:run-update-openclaw'),
   getUpdateState: (): Promise<DesktopUpdateState> => ipcRenderer.invoke('desktop:update:get-state'),

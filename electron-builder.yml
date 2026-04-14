@@ -2,7 +2,7 @@
 # Output: release/
 
 appId: dev.openclaw.desktop
-productName: OpenClaw 1Click
+productName: OpenClaw Desktop
 executableName: OpenClaw Desktop
 directories:
   output: release
@@ -28,9 +28,17 @@ files:
   - dist/**/*
   - assets/icon.ico
   - package.json
+  - scripts/hoist-openclaw-ext-deps.mjs
   - node_modules/**/*
   - "!**/*.map"
   - "!node_modules/openclaw/docs/**"
+
+  # --- SLIM: Loại openclaw và extension deps ra khỏi exe ---
+  # Chúng được download dưới dạng layers từ GitHub Releases lần đầu chạy app.
+
+  - "!node_modules/openclaw/**"
+  - "!node_modules/@buape/**"
+  - "!node_modules/@larksuiteoapi/**"
 
   # --- LOẠI BỎ PHẦN LỚN KHÔNG CẦN ---
 
@@ -104,6 +112,9 @@ files:
   - "!**/.openclaw-desktop-data/**"
   - "!**/.tmp-openclaw-upstream/**"
 
+  # Forked Control UI (built by npm run ui:build)
+  - "vendor/control-ui/**/*"
+
 extraResources:
   - from: resources
     to: resources
@@ -129,6 +140,6 @@ nsis:
   allowElevation: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: OpenClaw
-  uninstallDisplayName: OpenClaw
-  artifactName: "${productName}-1Click-Setup-${version}.${ext}"
+  shortcutName: OpenClaw Desktop
+  uninstallDisplayName: OpenClaw Desktop
+  artifactName: "Openclaw-Desktop-Setup-${version}.${ext}"
