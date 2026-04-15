@@ -2,21 +2,21 @@
 /**
  * pack-layer-openclaw.mjs
  *
- * Pack node_modules/openclaw/ → release/layer-openclaw-v{ver}.tar.gz
+ * Pack the openclaw package PLUS its full runtime dependency tree into one layer.
  *
- * Exclusions (mirror electron-builder.yml rules + RULE-02):
+ * Uses a recursive dep-walker starting from openclaw/package.json to collect
+ * only the packages that openclaw actually needs at runtime (no dev-tool bleed).
+ *
+ * Exclusions inside openclaw/:
  *   MUST:  openclaw/docs/
- *   MAY:   openclaw/dist/extensions/<ext>/node_modules/  (đã hoist lên openclaw/node_modules/)
- *          *.map, *.d.ts
- *          test/, __tests__/, spec/
- *          README*, CHANGELOG*, examples/, demo/, benchmark/, fixtures/
- *          tsconfig*.json, .eslintrc*, .prettierrc*, jest.config*, .npmignore
+ *   MAY:   openclaw/dist/extensions/<ext>/node_modules/  (already hoisted to openclaw/node_modules/)
+ *          *.map, *.d.ts, test/, __tests__/, README*, CHANGELOG*, examples/, benchmark/
  *
  * Output: release/layer-openclaw-v{ver}.tar.gz
  *         release/layer-openclaw-v{ver}.tar.gz.sha256
  *
- * Tar structure: entries start with node_modules/openclaw/
- * → extract to dataRoot/backend/ tạo ra dataRoot/backend/node_modules/openclaw/
+ * Tar structure: entries start with node_modules/<pkg>/
+ * → extract to dataRoot/backend/ → dataRoot/backend/node_modules/<pkg>/
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -30,7 +30,6 @@ const OPENCLAW_DIR = path.join(NM, 'openclaw')
 const RELEASE_DIR = path.join(ROOT, 'release')
 
 // ── Version ─────────────────────────────────────────────────────────────────
-// Đọc từ node_modules/openclaw/package.json (không phụ thuộc root package.json)
 const ocPkg = JSON.parse(fs.readFileSync(path.join(OPENCLAW_DIR, 'package.json'), 'utf8'))
 const ocVersion = ocPkg.version
 const OUTPUT = path.join(RELEASE_DIR, `layer-openclaw-v${ocVersion}.tar.gz`)
@@ -47,8 +46,108 @@ if (!fs.existsSync(path.join(OPENCLAW_DIR, 'openclaw.mjs'))) {
 
 fs.mkdirSync(RELEASE_DIR, { recursive: true })
 
+// ── Recursive dep walker ─────────────────────────────────────────────────────
+/**
+ * Given a package name, find its directory by walking up from a starting node_modules dir.
+ * npm flattens deps to the highest possible level, so we look in:
+ *   1. The immediate node_modules (peer context)
+ *   2. Root node_modules (hoisted)
+ */
+function findPkgDir(pkgName, contextNm = NM) {
+  // Check context node_modules first (nested resolution)
+  const localPath = path.join(contextNm, pkgName)
+  if (fs.existsSync(localPath) && fs.existsSync(path.join(localPath, 'package.json'))) {
+    return localPath
+  }
+  // Fall back to root node_modules
+  const rootPath = path.join(NM, pkgName)
+  if (fs.existsSync(rootPath) && fs.existsSync(path.join(rootPath, 'package.json'))) {
+    return rootPath
+  }
+  return null
+}
+
+/**
+ * Collect all packages in openclaw's runtime dep tree.
+ * Returns a Map<relPath, absPath> e.g. 'node_modules/tslog' → '/abs/path/to/tslog'
+ */
+const collected = new Map() // relPath → absPath
+const queue = [] // {pkgName, contextNm}
+
+// Seed with openclaw's direct deps
+const ocDepsAll = { ...ocPkg.dependencies }
+for (const dep of Object.keys(ocDepsAll)) {
+  queue.push({ pkgName: dep, contextNm: OPENCLAW_DIR + '/node_modules' })
+}
+
+// Also include openclaw itself (handled separately in tar entries)
+const OPENCLAW_REL = 'node_modules/openclaw'
+
+while (queue.length > 0) {
+  const { pkgName, contextNm } = queue.shift()
+
+  // Find the package directory
+  const pkgDir = findPkgDir(pkgName, contextNm)
+  if (!pkgDir) {
+    // Could be nested inside openclaw/node_modules (extension deps already hoisted)
+    continue
+  }
+
+  // Compute relative path from ROOT
+  const rel = path.relative(ROOT, pkgDir).replace(/\\/g, '/')
+  if (collected.has(rel)) continue // already visited
+  collected.set(rel, pkgDir)
+
+  // Walk this package's production dependencies
+  const pkgJsonPath = path.join(pkgDir, 'package.json')
+  let pkg
+  try {
+    pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'))
+  } catch {
+    continue
+  }
+
+  const deps = pkg.dependencies || {}
+  const peerDepsOptional = pkg.peerDependenciesMeta || {}
+  const peerDeps = pkg.peerDependencies || {}
+
+  for (const dep of Object.keys(deps)) {
+    // Look in this package's own node_modules first, then root
+    const nestedNm = path.join(pkgDir, 'node_modules')
+    queue.push({ pkgName: dep, contextNm: nestedNm })
+  }
+
+  // Include non-optional peerDependencies
+  for (const [dep, _ver] of Object.entries(peerDeps)) {
+    const meta = peerDepsOptional[dep]
+    if (meta?.optional) continue
+    const nestedNm = path.join(pkgDir, 'node_modules')
+    queue.push({ pkgName: dep, contextNm: nestedNm })
+  }
+}
+
+// Convert to set of relPaths (all unique top-level node_modules entries we need to include)
+// We want top-level paths only (node_modules/<pkg>), not nested node_modules inside packages
+// (those are already included when we tar the package dir recursively)
+const topLevelEntries = new Set([OPENCLAW_REL])
+for (const rel of collected.keys()) {
+  // Only include paths directly under root node_modules (not nested)
+  if (rel.startsWith('node_modules/') && rel.split('/').length === 2) {
+    topLevelEntries.add(rel)
+  } else if (rel.startsWith('node_modules/@') && rel.split('/').length === 3) {
+    // Scoped: node_modules/@scope/pkg
+    topLevelEntries.add(rel)
+  }
+  // Nested node_modules (node_modules/foo/node_modules/bar) are included via the parent dir
+}
+
+console.log(`[pack-openclaw] openclaw@${ocVersion}`)
+console.log(`[pack-openclaw] Dep tree: ${collected.size} packages resolved`)
+console.log(`[pack-openclaw] Top-level entries to pack: ${topLevelEntries.size}`)
+console.log(`[pack-openclaw] Output: ${path.relative(ROOT, OUTPUT)}`)
+console.log(`[pack-openclaw] Packing... (this may take 1–5 minutes)`)
+
 // ── Exclusion filter ─────────────────────────────────────────────────────────
-// `p` is relative to ROOT (cwd), using forward slashes.
 const EXT_NM_RE = /^node_modules\/openclaw\/dist\/extensions\/[^/]+\/node_modules(\/|$)/
 const TEST_DIR_RE = /\/(test|tests|__tests__|spec|specs)(\/|$)/i
 const META_FILE_RE = /^(README|CHANGELOG|CHANGES|HISTORY|NOTICE|AUTHORS|CONTRIBUTORS)(\.|$)/i
@@ -62,38 +161,24 @@ function shouldExclude(p) {
   // MUST: openclaw/docs/
   if (rel.startsWith('node_modules/openclaw/docs/') || rel === 'node_modules/openclaw/docs') return true
 
-  // MAY: dist/extensions/*/node_modules/
+  // MAY: dist/extensions/*/node_modules/ (already hoisted)
   if (EXT_NM_RE.test(rel)) return true
 
   const base = path.posix.basename(rel)
 
-  // Source maps and TypeScript declarations
   if (base.endsWith('.map') || base.endsWith('.d.ts')) return true
-
-  // Test directories
   if (TEST_DIR_RE.test(rel)) return true
-
-  // Documentation and meta files
   if (META_FILE_RE.test(base)) return true
-
-  // Dev config and junk extensions
   if (JUNK_EXT_RE.test(base)) return true
   if (RC_FILE_RE.test(base)) return true
   if (/^jest\.config/.test(base)) return true
   if (/^tsconfig.*\.json$/.test(base)) return true
-
-  // Example / demo / benchmark / fixture directories
   if (JUNK_DIR_RE.test(rel)) return true
 
   return false
 }
 
 // ── Pack ─────────────────────────────────────────────────────────────────────
-console.log(`[pack-openclaw] openclaw@${ocVersion}`)
-console.log(`[pack-openclaw] Source: node_modules/openclaw/`)
-console.log(`[pack-openclaw] Output: ${path.relative(ROOT, OUTPUT)}`)
-console.log(`[pack-openclaw] Packing... (this may take 1–3 minutes)`)
-
 const startTime = Date.now()
 
 await create(
@@ -104,7 +189,7 @@ await create(
     filter: (p) => !shouldExclude(p),
     portable: true,
   },
-  ['node_modules/openclaw']
+  [...topLevelEntries]
 )
 
 // ── SHA-256 ──────────────────────────────────────────────────────────────────
