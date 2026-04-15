@@ -279,6 +279,7 @@ export async function updateBackendLayers(opts: UpdateLayersOptions): Promise<vo
     const newVer: LocalBackendVersion = {
       version: manifest.version,
       electronVersion,
+      sha256: manifest.sha256,
     };
     writeLocalBackendVersion(dataRoot, newVer);
 

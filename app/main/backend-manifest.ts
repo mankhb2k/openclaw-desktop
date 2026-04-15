@@ -36,6 +36,8 @@ export interface LocalBackendVersion {
   version: string;
   /** Electron version mà binaries được build cho */
   electronVersion?: string;
+  /** SHA-256 của layer tar.gz đã cài — dùng để detect repacked layers */
+  sha256?: string;
 }
 
 const BACKEND_VERSION_FILE = 'backend-version.json';
@@ -47,9 +49,13 @@ export function readLocalBackendVersion(dataRoot: string): LocalBackendVersion |
     const parsed = JSON.parse(fs.readFileSync(versionFile, 'utf8')) as unknown;
     if (parsed && typeof parsed === 'object') {
       const p = parsed as Record<string, unknown>;
-      // schema v3: { version, electronVersion }
+      // schema v3: { version, electronVersion, sha256? }
       if (typeof p.version === 'string') {
-        return { version: p.version, electronVersion: p.electronVersion as string | undefined };
+        return {
+          version: p.version,
+          electronVersion: p.electronVersion as string | undefined,
+          sha256: p.sha256 as string | undefined,
+        };
       }
       // backward compat: old v2 format { "openclaw": "...", "root-runtime": "...", "electronVersion": "..." }
       if (typeof p.openclaw === 'string') {
@@ -128,7 +134,18 @@ export function needsUpdate(
     return false;
   }
 
-  return local.version !== manifest.version;
+  if (local.version !== manifest.version) return true;
+
+  // Same version but different SHA-256 → layer was repacked with fixes, need re-download
+  if (local.sha256 && local.sha256 !== manifest.sha256) {
+    console.warn(
+      `[backend-manifest] SHA-256 mismatch for v${local.version}: ` +
+        `local=${local.sha256.slice(0, 8)}… manifest=${manifest.sha256.slice(0, 8)}…`,
+    );
+    return true;
+  }
+
+  return false;
 }
 
 // ── Path helpers ──────────────────────────────────────────────────────────────
