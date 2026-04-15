@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-04-14T15:36:01.783Z",
+  "generatedAt": "2026-04-15T01:52:00.000Z",
   "electronVersion": "41.2.0",
   "platform": "win32",
   "arch": "x64",
@@ -17,9 +17,9 @@
     },
     "openclaw": {
       "version": "2026.4.5",
-      "sha256": "3876a65aed1a3bff0b0cfd0582fbc18a85f717d50615d75263e54231cbe6f0a4",
+      "sha256": "fd52458756125184c252abfea347fed1653aa6b75f98ab5aff7b9ba66976bdcc",
       "url": "https://github.com/Mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-openclaw-v2026.4.5.tar.gz",
-      "compressedBytes": 16862721,
+      "compressedBytes": 44607219,
       "uncompressedBytes": 0,
       "extractTo": "node_modules",
       "requiresHoist": true,
