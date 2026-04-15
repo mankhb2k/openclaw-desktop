@@ -1,39 +1,12 @@
 {
-  "schemaVersion": 2,
-  "generatedAt": "2026-04-15T01:52:00.000Z",
-  "electronVersion": "41.2.0",
-  "platform": "win32",
-  "arch": "x64",
-  "layers": {
-    "root-runtime": {
-      "version": "1",
-      "sha256": "7472ebfe86a6feed260ad8354c1827e3197f54f3efd7d115a35ec0eef96a1946",
-      "url": "https://github.com/Mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-root-runtime-v1.tar.gz",
-      "compressedBytes": 298470,
-      "uncompressedBytes": 0,
-      "extractTo": "node_modules",
-      "requiresHoist": false,
-      "changedFrom": null
-    },
-    "openclaw": {
-      "version": "2026.4.5",
-      "sha256": "87d283154f513cbeae220ba4285729bd7c595676545e7e27365cc9a70890c3c2",
-      "url": "https://github.com/Mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-openclaw-v2026.4.5.tar.gz",
-      "compressedBytes": 53514726,
-      "uncompressedBytes": 0,
-      "extractTo": "node_modules",
-      "requiresHoist": true,
-      "hoistScript": "scripts/hoist-openclaw-ext-deps.mjs",
-      "changedFrom": null
-    }
-  },
-  "extractOrder": [
-    "root-runtime",
-    "openclaw"
-  ],
+  "schemaVersion": 3,
+  "version": "2026.4.5",
+  "sha256": "7a13cd84735132a718a062aa30ce4f01d8bac2b7bf658098916cc31bfde7530c",
+  "url": "https://github.com/Mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-backend-v2026.4.5.tar.gz",
+  "compressedBytes": 53804166,
   "minAppVersion": "1.0.0",
   "releaseNotes": {
-    "vi": "Cập nhật openclaw lên 2026.4.5",
-    "en": "Update openclaw to 2026.4.5"
+    "vi": "Cập nhật backend lên 2026.4.5",
+    "en": "Update backend to 2026.4.5"
   }
 }
