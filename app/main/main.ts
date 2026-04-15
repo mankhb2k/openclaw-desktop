@@ -563,6 +563,29 @@ function startBackendLauncher(dataRoot: string): void {
 
   const electronRunner = resolveElectronRunnerPath();
   const backendCwd = path.dirname(electronRunner);
+
+  // Write debug info before spawn so we can diagnose failures
+  const debugInfo = {
+    ts: new Date().toISOString(),
+    electronRunner,
+    startScript,
+    backendCwd,
+    appRoot,
+    cliScript,
+    splitReady,
+    cliScriptExists: fs.existsSync(cliScript),
+    startScriptExists: (() => {
+      try { return fs.existsSync(startScript); } catch { return false; }
+    })(),
+    electronRunnerExists: fs.existsSync(electronRunner),
+  };
+  try {
+    fs.writeFileSync(
+      path.join(dataRoot, "launcher-debug.json"),
+      JSON.stringify(debugInfo, null, 2),
+    );
+  } catch { /* ignore */ }
+
   backendLauncher = spawn(electronRunner, [startScript], {
     cwd: backendCwd,
     env: {
@@ -580,13 +603,24 @@ function startBackendLauncher(dataRoot: string): void {
     windowsHide: true,
   });
 
-  const forward = (label: string, chunk: Buffer) => {
+  // Capture stderr to a debug log file in dataRoot
+  const debugLogPath = path.join(dataRoot, "launcher-stderr.log");
+  const appendDebugLog = (label: string, chunk: Buffer) => {
+    const line = `[${new Date().toISOString()}] [${label}] ${chunk.toString()}`;
     process.stdout.write(`[backend] ${label} ${chunk.toString()}`);
+    try { fs.appendFileSync(debugLogPath, line); } catch { /* ignore */ }
   };
-  backendLauncher.stdout?.on("data", (c) => forward("out", c));
-  backendLauncher.stderr?.on("data", (c) => forward("err", c));
+  backendLauncher.stdout?.on("data", (c) => appendDebugLog("out", c));
+  backendLauncher.stderr?.on("data", (c) => appendDebugLog("err", c));
+  backendLauncher.on("error", (err) => {
+    const msg = `[${new Date().toISOString()}] [spawn-error] ${err.message}\n`;
+    console.error("[backend] launcher spawn error:", err.message);
+    try { fs.appendFileSync(debugLogPath, msg); } catch { /* ignore */ }
+  });
   backendLauncher.on("exit", (code, signal) => {
+    const msg = `[${new Date().toISOString()}] [exit] code=${code} signal=${signal}\n`;
     console.error(`[backend] launcher exited code=${code} signal=${signal}`);
+    try { fs.appendFileSync(debugLogPath, msg); } catch { /* ignore */ }
     backendLauncher = null;
   });
 }
@@ -606,7 +640,6 @@ function scheduleBackendLayerCheck(dataRoot: string): void {
       manifestUrl: BACKEND_MANIFEST_URL,
       appVersion: app.getVersion(),
       electronVersion: process.versions.electron ?? "35.7.5",
-      projectRoot: getProjectRoot(),
       onProgress: (state: LayerUpdateState) => {
         console.log(
           "[layer-update]",
@@ -933,11 +966,15 @@ async function performInitialDownload(dataRoot: string): Promise<void> {
       manifestUrl: BACKEND_MANIFEST_URL,
       appVersion: app.getVersion(),
       electronVersion: process.versions.electron ?? "35.7.5",
-      projectRoot: getProjectRoot(),
       onProgress: sendProgress,
     });
 
     mainWindow?.setProgressBar(-1);
+
+    // Verify backend was actually installed before starting gateway
+    if (!isSplitModeReady(dataRoot)) {
+      throw new Error('Backend installation did not complete. Please try again.');
+    }
 
     // Backend ready → khởi động gateway và load Control UI
     const controlUiUrl = await ensureBackendAndGetUrl(dataRoot);
