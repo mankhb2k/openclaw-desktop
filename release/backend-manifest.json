@@ -17,9 +17,9 @@
     },
     "openclaw": {
       "version": "2026.4.5",
-      "sha256": "fd52458756125184c252abfea347fed1653aa6b75f98ab5aff7b9ba66976bdcc",
+      "sha256": "7148189eb810fb7f488b2f0832596461615d15ba5f76e7925d060d4cc6418f76",
       "url": "https://github.com/Mankhb2k/openclaw-desktop/releases/download/v1.0.0/layer-openclaw-v2026.4.5.tar.gz",
-      "compressedBytes": 44607219,
+      "compressedBytes": 44607195,
       "uncompressedBytes": 0,
       "extractTo": "node_modules",
       "requiresHoist": true,
