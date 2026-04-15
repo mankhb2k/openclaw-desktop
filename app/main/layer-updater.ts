@@ -214,12 +214,17 @@ export async function updateBackendLayers(opts: UpdateLayersOptions): Promise<vo
     // ── Step 3: Diff with local ─────────────────────────────────────────────
     const local = readLocalBackendVersion(dataRoot);
     if (!needsUpdate(local, manifest, electronVersion)) {
-      onProgress({
-        phase: 'complete',
-        message: 'Backend is up to date.',
-        installedVersion: local?.version,
-      });
-      return;
+      // Version matches, but also verify backend is physically present.
+      // If openclaw.mjs is missing (stale/broken install), force re-download.
+      if (isSplitModeReady(dataRoot)) {
+        onProgress({
+          phase: 'complete',
+          message: 'Backend is up to date.',
+          installedVersion: local?.version,
+        });
+        return;
+      }
+      console.warn('[layer-updater] Version matches but backend not ready — forcing re-download');
     }
 
     if (checkOnly) {
